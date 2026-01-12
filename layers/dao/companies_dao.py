@@ -59,3 +59,21 @@ class CompanyDAO:
         if company:
             _ = company.users
         return company
+    
+    def update_embedding_model(self, company_id: int, embedding_model: str, embedding_type: str = "local") -> Optional[Company]:
+        """Update the embedding model for a company."""
+        company = self.get_company_by_id(company_id)
+        if company:
+            company.embedding_model = embedding_model
+            company.embedding_type = embedding_type
+            self.session.add(company)
+            self.session.commit()
+            self.session.refresh(company)
+        return company
+    
+    def get_embedding_model(self, company_id: int) -> Optional[tuple[str, str]]:
+        """Get the embedding model and type for a company."""
+        company = self.get_company_by_id(company_id)
+        if company:
+            return (company.embedding_model, company.embedding_type)
+        return None

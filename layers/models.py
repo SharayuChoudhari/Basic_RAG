@@ -14,6 +14,8 @@ class Company(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     description: Optional[str] = None
+    embedding_model: str = Field(default="all-MiniLM-L6-v2", index=True)
+    embedding_type: str = Field(default="local", index=True)  # local, openai, huggingface
     created_at: datetime = Field(default_factory=get_current_utc_time)
     
     # Relationship to users (one-to-many)
