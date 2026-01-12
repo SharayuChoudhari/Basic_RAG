@@ -105,3 +105,24 @@ class DocumentVectorDAO:
                     filtered_vectors.append(vector)
         
         return filtered_vectors
+    
+    def get_vectors_by_user_id(self, user_id: int) -> List[DocumentVector]:
+        """Get all vectors for a specific user."""
+        statement = select(DocumentVector).where(DocumentVector.user_id == user_id)
+        result = self.session.exec(statement)
+        return result.all()
+    
+    def get_vectors_by_company_id(self, company_id: int) -> List[DocumentVector]:
+        """Get all vectors for a specific company."""
+        statement = select(DocumentVector).where(DocumentVector.company_id == company_id)
+        result = self.session.exec(statement)
+        return result.all()
+    
+    def get_vectors_by_user_and_company(self, user_id: int, company_id: int) -> List[DocumentVector]:
+        """Get all vectors for a specific user within a company."""
+        statement = select(DocumentVector).where(
+            DocumentVector.user_id == user_id,
+            DocumentVector.company_id == company_id
+        )
+        result = self.session.exec(statement)
+        return result.all()

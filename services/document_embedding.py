@@ -15,9 +15,10 @@ class DocumentEmbeddingService:
         self.document_vector_dao = DocumentVectorDAO(session)
     
     def process_document(
-        self, 
-        text: str, 
+        self,
+        text: str,
         user_id: int,
+        company_id: Optional[int] = None,
         chunk_size: int = 1000,
         overlap: int = 200,
         metadata: Optional[Dict[str, Any]] = None
@@ -28,6 +29,7 @@ class DocumentEmbeddingService:
         Args:
             text: The document text to process
             user_id: The ID of the user owning this document
+            company_id: The ID of the company owning this document (optional)
             chunk_size: Size of each chunk in characters
             overlap: Overlap between chunks in characters
             metadata: Additional metadata to store with the document
@@ -51,7 +53,9 @@ class DocumentEmbeddingService:
                 embedding=embedding,
                 meta_data=metadata or {},
                 document_id=document_id,
-                chunk_index=i
+                chunk_index=i,
+                user_id=user_id,
+                company_id=company_id
             )
             self.document_vector_dao.create_document_vector(document_vector)
         

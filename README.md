@@ -408,6 +408,46 @@ curl -X GET "http://localhost:8000/health"
 }
 ```
 
+## User and Company Tracking
+
+All document embeddings now include `user_id` and `company_id` for proper ownership tracking and access control:
+
+### Automatic Tracking
+
+When uploading documents, the system automatically:
+1. Stores `user_id` with each document chunk (defaults to 0 if not provided)
+2. Stores `company_id` with each document chunk (optional, for multi-tenant scenarios)
+3. Uses company's embedding model settings when `company_id` is provided
+
+### Benefits
+
+- **Multi-tenant Support**: Different companies can have separate document collections
+- **User Isolation**: Documents are associated with specific users
+- **Access Control**: Easy to filter documents by user or company
+- **Audit Trail**: Complete tracking of document ownership
+
+### Query Examples
+
+```python
+from layers.dao import DocumentVectorDAO
+from layers.database import SessionLocal
+
+session = SessionLocal()
+dao = DocumentVectorDAO(session)
+
+# Get all documents for a user
+user_docs = dao.get_vectors_by_user_id(user_id=1)
+
+# Get all documents for a company
+company_docs = dao.get_vectors_by_company_id(company_id=1)
+
+# Get documents for a specific user within a company
+user_company_docs = dao.get_vectors_by_user_and_company(
+    user_id=1,
+    company_id=1
+)
+```
+
 ## Company-Specific Embedding Models
 
 Each company can have its own embedding model configuration, allowing different companies to use different embedding strategies:
@@ -481,6 +521,19 @@ If no `company_id` is provided, the system uses the default embedding model from
 | meta_data | JSONB | Additional metadata |
 | document_id | String | Document identifier |
 | chunk_index | Integer | Chunk order |
+| user_id | Integer | User ID (indexed) |
+| company_id | Integer | Company ID (indexed, optional) |
+| created_at | Timestamp | Creation time |
+
+### Company Table
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | Integer | Primary key |
+| name | String | Company name (indexed) |
+| description | String | Company description |
+| embedding_model | String | Embedding model name (indexed) |
+| embedding_type | String | Embedding type (indexed) |
 | created_at | Timestamp | Creation time |
 
 ## Development

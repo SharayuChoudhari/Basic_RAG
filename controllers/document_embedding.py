@@ -271,6 +271,7 @@ async def upload_pdf(
         document_id = document_embedding_service.process_document(
             text=text,
             user_id=user_id or 0,
+            company_id=company_id,
             chunk_size=chunk_size,
             overlap=overlap,
             metadata=parsed_metadata
@@ -391,6 +392,7 @@ async def upload_pdf_batch(
             document_id = document_embedding_service.process_document(
                 text=text,
                 user_id=user_id or 0,
+                company_id=company_id,
                 chunk_size=chunk_size,
                 overlap=overlap,
                 metadata=file_metadata

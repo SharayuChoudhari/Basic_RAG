@@ -66,4 +66,6 @@ class DocumentVector(SQLModel, table=True):
     meta_data: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
     document_id: str = Field(index=True)
     chunk_index: int = Field(default=0)
+    user_id: int = Field(default=0, index=True)
+    company_id: Optional[int] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=get_current_utc_time)
