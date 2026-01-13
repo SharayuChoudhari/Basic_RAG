@@ -1,4 +1,5 @@
 from typing import List, Optional
+from uuid import UUID
 from sqlmodel import Session, select
 from layers.models import Prompt, User
 
@@ -16,7 +17,7 @@ class PromptDAO:
         self.session.refresh(prompt)
         return prompt
     
-    def get_prompt_by_id(self, prompt_id: int) -> Optional[Prompt]:
+    def get_prompt_by_id(self, prompt_id: UUID) -> Optional[Prompt]:
         """Get a prompt by ID."""
         statement = select(Prompt).where(Prompt.id == prompt_id)
         result = self.session.exec(statement)
@@ -28,7 +29,7 @@ class PromptDAO:
         result = self.session.exec(statement)
         return result.all()
     
-    def get_prompts_by_user(self, user_id: int) -> List[Prompt]:
+    def get_prompts_by_user(self, user_id: UUID) -> List[Prompt]:
         """Get all prompts for a specific user."""
         statement = select(Prompt).where(Prompt.user_id == user_id)
         result = self.session.exec(statement)
@@ -41,7 +42,7 @@ class PromptDAO:
         self.session.refresh(prompt)
         return prompt
     
-    def delete_prompt(self, prompt_id: int) -> bool:
+    def delete_prompt(self, prompt_id: UUID) -> bool:
         """Delete a prompt by ID."""
         prompt = self.get_prompt_by_id(prompt_id)
         if prompt:
@@ -50,7 +51,7 @@ class PromptDAO:
             return True
         return False
     
-    def get_prompt_with_user(self, prompt_id: int) -> Optional[Prompt]:
+    def get_prompt_with_user(self, prompt_id: UUID) -> Optional[Prompt]:
         """Get a prompt with its user information."""
         statement = select(Prompt).where(Prompt.id == prompt_id)
         result = self.session.exec(statement)

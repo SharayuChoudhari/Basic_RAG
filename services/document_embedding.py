@@ -1,5 +1,6 @@
 import uuid
 from typing import List, Dict, Any, Optional, Tuple
+from uuid import UUID
 from sqlmodel import Session
 from layers.models import DocumentVector
 from layers.dao import DocumentVectorDAO
@@ -17,12 +18,12 @@ class DocumentEmbeddingService:
     def process_document(
         self,
         text: str,
-        user_id: int,
-        company_id: Optional[int] = None,
+        user_id: UUID,
+        company_id: Optional[UUID] = None,
         chunk_size: int = 1000,
         overlap: int = 200,
         metadata: Optional[Dict[str, Any]] = None
-    ) -> str:
+    ) -> UUID:
         """
         Process a document by chunking, vectorizing, and storing embeddings.
         
@@ -38,7 +39,7 @@ class DocumentEmbeddingService:
             The document ID
         """
         # Generate a unique document ID
-        document_id = str(uuid.uuid4())
+        document_id = uuid.uuid4()
         
         # Chunk the document
         chunks = self._sliding_window_chunk(text, chunk_size, overlap)
@@ -105,18 +106,18 @@ class DocumentEmbeddingService:
         
         return chunks
     
-    def get_document_chunks(self, document_id: str) -> List[DocumentVector]:
+    def get_document_chunks(self, document_id: UUID) -> List[DocumentVector]:
         """Get all chunks for a document."""
         return self.document_vector_dao.get_vectors_by_document_id_ordered(document_id)
     
-    def delete_document(self, document_id: str) -> bool:
+    def delete_document(self, document_id: UUID) -> bool:
         """Delete all vectors for a document."""
         return self.document_vector_dao.delete_vectors_by_document_id(document_id)
     
     def search_similar_documents(
-        self, 
-        query: str, 
-        user_id: Optional[int] = None,
+        self,
+        query: str,
+        user_id: Optional[UUID] = None,
         limit: int = 5
     ) -> List[Tuple[DocumentVector, float]]:
         """
@@ -181,7 +182,7 @@ class DocumentEmbeddingService:
         
         return dot / (mag1 * mag2)
     
-    def update_document_metadata(self, document_id: str, metadata: Dict[str, Any]) -> bool:
+    def update_document_metadata(self, document_id: UUID, metadata: Dict[str, Any]) -> bool:
         """Update metadata for all chunks of a document."""
         vectors = self.document_vector_dao.get_vectors_by_document_id(document_id)
         

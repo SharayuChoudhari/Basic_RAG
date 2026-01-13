@@ -116,6 +116,248 @@ Once the server is running, visit:
 
 ## API Endpoints
 
+### Companies API
+
+#### 1. Create Company
+
+**Endpoint**: `POST /api/v1/companies/`
+
+Create a new company with embedding model settings.
+
+**Request Body**:
+```json
+{
+  "name": "Acme Corp",
+  "description": "Technology company",
+  "embedding_model": "all-MiniLM-L6-v2",
+  "embedding_type": "local"
+}
+```
+
+**Example using curl**:
+```bash
+curl -X POST "http://localhost:8000/api/v1/companies/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Corp",
+    "description": "Technology company",
+    "embedding_model": "all-MiniLM-L6-v2",
+    "embedding_type": "local"
+  }'
+```
+
+**Response**:
+```json
+{
+  "id": 1,
+  "name": "Acme Corp",
+  "description": "Technology company",
+  "embedding_model": "all-MiniLM-L6-v2",
+  "embedding_type": "local",
+  "created_at": "2024-01-12T10:00:00"
+}
+```
+
+#### 2. Get All Companies
+
+**Endpoint**: `GET /api/v1/companies/`
+
+Retrieve all companies.
+
+**Example**:
+```bash
+curl -X GET "http://localhost:8000/api/v1/companies/"
+```
+
+#### 3. Get Company by ID
+
+**Endpoint**: `GET /api/v1/companies/{company_id}`
+
+Get a specific company by ID.
+
+**Example**:
+```bash
+curl -X GET "http://localhost:8000/api/v1/companies/1"
+```
+
+#### 4. Update Company
+
+**Endpoint**: `PUT /api/v1/companies/{company_id}`
+
+Update company details.
+
+**Request Body**:
+```json
+{
+  "name": "Updated Company Name",
+  "description": "Updated description",
+  "embedding_model": "text-embedding-ada-002",
+  "embedding_type": "openai"
+}
+```
+
+**Example**:
+```bash
+curl -X PUT "http://localhost:8000/api/v1/companies/1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "embedding_model": "text-embedding-ada-002",
+    "embedding_type": "openai"
+  }'
+```
+
+#### 5. Update Company Embedding Model
+
+**Endpoint**: `PUT /api/v1/companies/{company_id}/embedding-model`
+
+Update only the embedding model settings for a company.
+
+**Example**:
+```bash
+curl -X PUT "http://localhost:8000/api/v1/companies/1/embedding-model?embedding_model=text-embedding-ada-002&embedding_type=openai"
+```
+
+#### 6. Delete Company
+
+**Endpoint**: `DELETE /api/v1/companies/{company_id}`
+
+Delete a company.
+
+**Example**:
+```bash
+curl -X DELETE "http://localhost:8000/api/v1/companies/1"
+```
+
+### Users API
+
+#### 1. Create User
+
+**Endpoint**: `POST /api/v1/users/`
+
+Create a new user.
+
+**Request Body**:
+```json
+{
+  "email": "user@example.com",
+  "name": "John Doe",
+  "company_id": 1
+}
+```
+
+**Example using curl**:
+```bash
+curl -X POST "http://localhost:8000/api/v1/users/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "name": "John Doe",
+    "company_id": 1
+  }'
+```
+
+**Response**:
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "name": "John Doe",
+  "company_id": 1,
+  "created_at": "2024-01-12T10:00:00"
+}
+```
+
+#### 2. Get All Users
+
+**Endpoint**: `GET /api/v1/users/`
+
+Retrieve all users.
+
+**Example**:
+```bash
+curl -X GET "http://localhost:8000/api/v1/users/"
+```
+
+#### 3. Get User by ID
+
+**Endpoint**: `GET /api/v1/users/{user_id}`
+
+Get a specific user by ID.
+
+**Example**:
+```bash
+curl -X GET "http://localhost:8000/api/v1/users/1"
+```
+
+#### 4. Get User by Email
+
+**Endpoint**: `GET /api/v1/users/email/{email}`
+
+Get a user by email address.
+
+**Example**:
+```bash
+curl -X GET "http://localhost:8000/api/v1/users/email/user@example.com"
+```
+
+#### 5. Update User
+
+**Endpoint**: `PUT /api/v1/users/{user_id}`
+
+Update user details.
+
+**Request Body**:
+```json
+{
+  "name": "Updated Name",
+  "company_id": 2
+}
+```
+
+**Example**:
+```bash
+curl -X PUT "http://localhost:8000/api/v1/users/1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Updated Name"
+  }'
+```
+
+#### 6. Delete User
+
+**Endpoint**: `DELETE /api/v1/users/{user_id}`
+
+Delete a user.
+
+**Example**:
+```bash
+curl -X DELETE "http://localhost:8000/api/v1/users/1"
+```
+
+#### 7. Get User's Company
+
+**Endpoint**: `GET /api/v1/users/{user_id}/company`
+
+Get the company associated with a user.
+
+**Example**:
+```bash
+curl -X GET "http://localhost:8000/api/v1/users/1/company"
+```
+
+**Response**:
+```json
+{
+  "company_id": 1,
+  "name": "Acme Corp",
+  "description": "Technology company",
+  "embedding_model": "all-MiniLM-L6-v2",
+  "embedding_type": "local"
+}
+```
+
+### Documents API
+
 ### 1. Upload PDF Document (Enhanced)
 
 **Endpoint**: `POST /api/v1/documents/upload`

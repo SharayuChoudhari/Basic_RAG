@@ -89,11 +89,35 @@ class HuggingFaceVectorizer(Vectorizer):
 class LocalVectorizer(Vectorizer):
     """Local vectorizer using sentence-transformers."""
     
-    def __init__(self, model: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model: str = "all-MiniLM-L6-v2", device: Optional[str] = None):
         self.model = model
         try:
             from sentence_transformers import SentenceTransformer
-            self.model_instance = SentenceTransformer(model)
+            import torch
+            
+            # Determine device if not specified
+            if device is None:
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+            
+            # Load model with explicit device to avoid meta tensor issues
+            self.model_instance = SentenceTransformer(
+                model,
+                device=device
+            )
+            
+            # Ensure model is properly initialized by running a dummy forward pass
+            # This forces the model to materialize from meta tensors if needed
+            try:
+                with torch.no_grad():
+                    _ = self.model_instance.encode(["test"], convert_to_tensor=True)
+            except Exception as e:
+                # If dummy forward pass fails, try to reinitialize the model
+                # This handles cases where meta tensors were used during initialization
+                self.model_instance = SentenceTransformer(
+                    model,
+                    device=device
+                )
+                
         except ImportError:
             raise ImportError("sentence-transformers is required for LocalVectorizer. Install with: pip install sentence-transformers")
     

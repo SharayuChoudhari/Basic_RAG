@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from layers.database import create_db_and_tables
 from controllers.document_embedding import router as document_embedding_router
+from controllers.companies import router as companies_router
+from controllers.users import router as users_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -21,6 +23,8 @@ app.add_middleware(
 
 # Include routers
 app.include_router(document_embedding_router, prefix="/api/v1/documents", tags=["documents"])
+app.include_router(companies_router, prefix="/api/v1/companies", tags=["companies"])
+app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
 
 
 @app.on_event("startup")

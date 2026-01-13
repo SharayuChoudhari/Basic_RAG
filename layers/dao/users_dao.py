@@ -1,4 +1,5 @@
 from typing import List, Optional
+from uuid import UUID
 from sqlmodel import Session, select
 from layers.models import User, Company, Prompt
 
@@ -16,7 +17,7 @@ class UserDAO:
         self.session.refresh(user)
         return user
     
-    def get_user_by_id(self, user_id: int) -> Optional[User]:
+    def get_user_by_id(self, user_id: UUID) -> Optional[User]:
         """Get a user by ID."""
         statement = select(User).where(User.id == user_id)
         result = self.session.exec(statement)
@@ -41,7 +42,7 @@ class UserDAO:
         self.session.refresh(user)
         return user
     
-    def delete_user(self, user_id: int) -> bool:
+    def delete_user(self, user_id: UUID) -> bool:
         """Delete a user by ID."""
         user = self.get_user_by_id(user_id)
         if user:
@@ -50,7 +51,7 @@ class UserDAO:
             return True
         return False
     
-    def assign_user_to_company(self, user_id: int, company_id: int) -> Optional[User]:
+    def assign_user_to_company(self, user_id: UUID, company_id: UUID) -> Optional[User]:
         """Assign a user to a company."""
         user = self.get_user_by_id(user_id)
         if user:
@@ -60,13 +61,13 @@ class UserDAO:
             self.session.refresh(user)
         return user
     
-    def get_users_by_company(self, company_id: int) -> List[User]:
+    def get_users_by_company(self, company_id: UUID) -> List[User]:
         """Get all users belonging to a specific company."""
         statement = select(User).where(User.company_id == company_id)
         result = self.session.exec(statement)
         return result.all()
     
-    def get_user_with_prompts(self, user_id: int) -> Optional[User]:
+    def get_user_with_prompts(self, user_id: UUID) -> Optional[User]:
         """Get a user with their prompts."""
         statement = select(User).where(User.id == user_id)
         result = self.session.exec(statement)
@@ -76,7 +77,7 @@ class UserDAO:
             _ = user.prompts
         return user
     
-    def get_user_with_company(self, user_id: int) -> Optional[User]:
+    def get_user_with_company(self, user_id: UUID) -> Optional[User]:
         """Get a user with their company information."""
         statement = select(User).where(User.id == user_id)
         result = self.session.exec(statement)

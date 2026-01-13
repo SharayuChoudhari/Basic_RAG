@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
 from sqlmodel import Session
 from typing import Optional, Dict, Any, List
+from uuid import UUID
 import os
 from pypdf import PdfReader
 import io
@@ -11,6 +12,13 @@ from services.document_embedding import DocumentEmbeddingService
 from services.vectorizer import VectorizerFactory
 from layers.dao import CompanyDAO
 from layers.models import Company
+from layers.schemas import (
+    DocumentUploadResponse,
+    DocumentPreviewResponse,
+    DocumentGetResponse,
+    DocumentBatchResponse,
+    DocumentSearchResponse
+)
 
 # Create router
 router = APIRouter()
@@ -25,7 +33,7 @@ ALLOWED_MIME_TYPES = ["application/pdf"]
 
 
 def get_company_embedding_settings(
-    company_id: Optional[int],
+    company_id: Optional[UUID],
     session: Session
 ) -> tuple[str, str]:
     """
@@ -49,7 +57,7 @@ def get_company_embedding_settings(
 
 
 def get_document_embedding_service(
-    company_id: Optional[int] = None,
+    company_id: Optional[UUID] = None,
     session: Session = Depends(get_db_session)
 ) -> DocumentEmbeddingService:
     """
@@ -71,6 +79,23 @@ def get_document_embedding_service(
         model=embedding_model
     )
     return DocumentEmbeddingService(session=session, vectorizer=vectorizer)
+
+
+def get_document_embedding_service_with_company(
+    company_id: Optional[UUID] = None,
+    session: Session = Depends(get_db_session)
+) -> DocumentEmbeddingService:
+    """
+    Dependency wrapper that allows company_id to be passed from endpoint parameters.
+    
+    Args:
+        company_id: Optional company ID to get embedding settings from
+        session: Database session
+        
+    Returns:
+        DocumentEmbeddingService instance
+    """
+    return get_document_embedding_service(company_id, session)
 
 
 def validate_pdf_file(pdf_file: UploadFile) -> None:
@@ -185,15 +210,15 @@ def extract_text_from_pdf(pdf_file: UploadFile) -> tuple[str, Dict[str, Any]]:
 @router.post("/upload")
 async def upload_pdf(
     file: UploadFile = File(..., description="PDF file to upload"),
-    company_id: Optional[int] = Form(None, description="Company ID (optional, uses company's embedding model settings)"),
-    user_id: Optional[int] = Form(None, description="User ID (optional)"),
+    company_id: Optional[UUID] = Form(None, description="Company ID (optional, uses company's embedding model settings)"),
+    user_id: Optional[UUID] = Form(None, description="User ID (optional)"),
     chunk_size: int = Form(1000, description="Size of each chunk in characters"),
     overlap: int = Form(200, description="Overlap between chunks in characters"),
     metadata: Optional[str] = Form(None, description="Additional metadata as JSON string"),
     preview_only: bool = Form(False, description="If true, only preview extracted text without creating embeddings"),
     skip_empty_chunks: bool = Form(True, description="Skip chunks with no text content"),
     clean_text: bool = Form(True, description="Clean and normalize text before processing"),
-    document_embedding_service: DocumentEmbeddingService = Depends(lambda session=Depends(get_db_session): get_document_embedding_service(company_id, session))
+    document_embedding_service: DocumentEmbeddingService = Depends(get_document_embedding_service_with_company)
 ):
     """
     Upload a PDF file, extract text, create embeddings, and store in database.
@@ -257,14 +282,14 @@ async def upload_pdf(
     
     # If preview only, return extracted text without processing
     if preview_only:
-        return {
-            "status": "preview",
-            "filename": file.filename,
-            "text_length": len(text),
-            "text_preview": text[:1000] + "..." if len(text) > 1000 else text,
-            "estimated_chunks": max(1, len(text) // (chunk_size - overlap)),
-            "metadata": parsed_metadata
-        }
+        return DocumentPreviewResponse(
+            status="preview",
+            filename=file.filename,
+            text_length=len(text),
+            text_preview=text[:1000] + "..." if len(text) > 1000 else text,
+            estimated_chunks=max(1, len(text) // (chunk_size - overlap)),
+            metadata=parsed_metadata
+        )
     
     # Process document and create embeddings
     try:
@@ -284,21 +309,21 @@ async def upload_pdf(
         if skip_empty_chunks:
             chunks = [c for c in chunks if c.content.strip()]
         
-        return {
-            "status": "success",
-            "document_id": document_id,
-            "filename": file.filename,
-            "text_length": len(text),
-            "num_chunks": len(chunks),
-            "chunk_size": chunk_size,
-            "overlap": overlap,
-            "metadata": parsed_metadata,
-            "processing_info": {
+        return DocumentUploadResponse(
+            status="success",
+            document_id=document_id,
+            filename=file.filename,
+            text_length=len(text),
+            num_chunks=len(chunks),
+            chunk_size=chunk_size,
+            overlap=overlap,
+            metadata=parsed_metadata,
+            processing_info={
                 "pages_processed": pdf_metadata.get("page_count", 0),
                 "text_cleaned": clean_text,
                 "empty_chunks_skipped": skip_empty_chunks
             }
-        }
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -309,14 +334,14 @@ async def upload_pdf(
 @router.post("/upload/batch")
 async def upload_pdf_batch(
     files: List[UploadFile] = File(..., description="Multiple PDF files to upload"),
-    company_id: Optional[int] = Form(None, description="Company ID (optional, uses company's embedding model settings)"),
-    user_id: Optional[int] = Form(None, description="User ID (optional)"),
+    company_id: Optional[UUID] = Form(None, description="Company ID (optional, uses company's embedding model settings)"),
+    user_id: Optional[UUID] = Form(None, description="User ID (optional)"),
     chunk_size: int = Form(1000, description="Size of each chunk in characters"),
     overlap: int = Form(200, description="Overlap between chunks in characters"),
     metadata: Optional[str] = Form(None, description="Additional metadata as JSON string (applied to all files)"),
     skip_empty_chunks: bool = Form(True, description="Skip chunks with no text content"),
     clean_text: bool = Form(True, description="Clean and normalize text before processing"),
-    document_embedding_service: DocumentEmbeddingService = Depends(lambda session=Depends(get_db_session): get_document_embedding_service(company_id, session))
+    document_embedding_service: DocumentEmbeddingService = Depends(get_document_embedding_service_with_company)
 ):
     """
     Upload multiple PDF files in batch, extract text, create embeddings, and store in database.
@@ -420,14 +445,14 @@ async def upload_pdf_batch(
                 "error": str(e)
             })
     
-    return {
-        "status": "completed",
-        "total_files": len(files),
-        "successful": len(results),
-        "failed": len(errors),
-        "results": results,
-        "errors": errors
-    }
+    return DocumentBatchResponse(
+        status="completed",
+        total_files=len(files),
+        successful=len(results),
+        failed=len(errors),
+        results=results,
+        errors=errors
+    )
 
 
 def clean_text_content(text: str) -> str:
@@ -458,9 +483,9 @@ def clean_text_content(text: str) -> str:
 
 @router.get("/{document_id}")
 async def get_document(
-    document_id: str,
-    company_id: Optional[int] = None,
-    document_embedding_service: DocumentEmbeddingService = Depends(lambda session=Depends(get_db_session): get_document_embedding_service(company_id, session))
+    document_id: UUID,
+    company_id: Optional[UUID] = None,
+    document_embedding_service: DocumentEmbeddingService = Depends(get_document_embedding_service_with_company)
 ):
     """
     Get all chunks for a specific document.
@@ -481,10 +506,10 @@ async def get_document(
                 detail=f"Document with ID {document_id} not found"
             )
         
-        return {
-            "document_id": document_id,
-            "num_chunks": len(chunks),
-            "chunks": [
+        return DocumentGetResponse(
+            document_id=document_id,
+            num_chunks=len(chunks),
+            chunks=[
                 {
                     "chunk_index": chunk.chunk_index,
                     "content": chunk.content,
@@ -494,7 +519,7 @@ async def get_document(
                 }
                 for chunk in chunks
             ]
-        }
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -506,9 +531,9 @@ async def get_document(
 
 @router.delete("/{document_id}")
 async def delete_document(
-    document_id: str,
-    company_id: Optional[int] = None,
-    document_embedding_service: DocumentEmbeddingService = Depends(lambda session=Depends(get_db_session): get_document_embedding_service(company_id, session))
+    document_id: UUID,
+    company_id: Optional[UUID] = None,
+    document_embedding_service: DocumentEmbeddingService = Depends(get_document_embedding_service_with_company)
 ):
     """
     Delete a document and all its chunks.
@@ -545,10 +570,10 @@ async def delete_document(
 @router.post("/search")
 async def search_documents(
     query: str = Form(..., description="Search query text"),
-    company_id: Optional[int] = Form(None, description="Company ID (optional, uses company's embedding model settings)"),
-    user_id: Optional[int] = Form(None, description="User ID to filter by (optional)"),
+    company_id: Optional[UUID] = Form(None, description="Company ID (optional, uses company's embedding model settings)"),
+    user_id: Optional[UUID] = Form(None, description="User ID to filter by (optional)"),
     limit: int = Form(5, description="Maximum number of results"),
-    document_embedding_service: DocumentEmbeddingService = Depends(lambda session=Depends(get_db_session): get_document_embedding_service(company_id, session))
+    document_embedding_service: DocumentEmbeddingService = Depends(get_document_embedding_service_with_company)
 ):
     """
     Search for similar documents using vector similarity.
@@ -569,10 +594,10 @@ async def search_documents(
             limit=limit
         )
         
-        return {
-            "query": query,
-            "num_results": len(results),
-            "results": [
+        return DocumentSearchResponse(
+            query=query,
+            num_results=len(results),
+            results=[
                 {
                     "document_id": vector.document_id,
                     "chunk_index": vector.chunk_index,
@@ -582,7 +607,7 @@ async def search_documents(
                 }
                 for vector, score in results
             ]
-        }
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,

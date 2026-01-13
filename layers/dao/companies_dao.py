@@ -1,4 +1,5 @@
 from typing import List, Optional
+from uuid import UUID
 from sqlmodel import Session, select
 from layers.models import Company, User
 
@@ -16,7 +17,7 @@ class CompanyDAO:
         self.session.refresh(company)
         return company
     
-    def get_company_by_id(self, company_id: int) -> Optional[Company]:
+    def get_company_by_id(self, company_id: UUID) -> Optional[Company]:
         """Get a company by ID."""
         statement = select(Company).where(Company.id == company_id)
         result = self.session.exec(statement)
@@ -41,7 +42,7 @@ class CompanyDAO:
         self.session.refresh(company)
         return company
     
-    def delete_company(self, company_id: int) -> bool:
+    def delete_company(self, company_id: UUID) -> bool:
         """Delete a company by ID."""
         company = self.get_company_by_id(company_id)
         if company:
@@ -50,7 +51,7 @@ class CompanyDAO:
             return True
         return False
     
-    def get_company_with_users(self, company_id: int) -> Optional[Company]:
+    def get_company_with_users(self, company_id: UUID) -> Optional[Company]:
         """Get a company with its users."""
         statement = select(Company).where(Company.id == company_id)
         result = self.session.exec(statement)
@@ -60,7 +61,7 @@ class CompanyDAO:
             _ = company.users
         return company
     
-    def update_embedding_model(self, company_id: int, embedding_model: str, embedding_type: str = "local") -> Optional[Company]:
+    def update_embedding_model(self, company_id: UUID, embedding_model: str, embedding_type: str = "local") -> Optional[Company]:
         """Update the embedding model for a company."""
         company = self.get_company_by_id(company_id)
         if company:
@@ -71,7 +72,7 @@ class CompanyDAO:
             self.session.refresh(company)
         return company
     
-    def get_embedding_model(self, company_id: int) -> Optional[tuple[str, str]]:
+    def get_embedding_model(self, company_id: UUID) -> Optional[tuple[str, str]]:
         """Get the embedding model and type for a company."""
         company = self.get_company_by_id(company_id)
         if company:

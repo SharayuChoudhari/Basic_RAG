@@ -1,4 +1,5 @@
 from typing import List, Optional, Dict, Any
+from uuid import UUID
 from sqlmodel import Session, select
 from layers.models import DocumentVector
 
@@ -16,7 +17,7 @@ class DocumentVectorDAO:
         self.session.refresh(document_vector)
         return document_vector
     
-    def get_document_vector_by_id(self, vector_id: int) -> Optional[DocumentVector]:
+    def get_document_vector_by_id(self, vector_id: UUID) -> Optional[DocumentVector]:
         """Get a document vector by ID."""
         statement = select(DocumentVector).where(DocumentVector.id == vector_id)
         result = self.session.exec(statement)
@@ -28,13 +29,13 @@ class DocumentVectorDAO:
         result = self.session.exec(statement)
         return result.all()
     
-    def get_vectors_by_document_id(self, document_id: str) -> List[DocumentVector]:
+    def get_vectors_by_document_id(self, document_id: UUID) -> List[DocumentVector]:
         """Get all vectors for a specific document."""
         statement = select(DocumentVector).where(DocumentVector.document_id == document_id)
         result = self.session.exec(statement)
         return result.all()
     
-    def get_vectors_by_document_id_ordered(self, document_id: str) -> List[DocumentVector]:
+    def get_vectors_by_document_id_ordered(self, document_id: UUID) -> List[DocumentVector]:
         """Get all vectors for a specific document ordered by chunk index."""
         statement = select(DocumentVector).where(
             DocumentVector.document_id == document_id
@@ -49,7 +50,7 @@ class DocumentVectorDAO:
         self.session.refresh(document_vector)
         return document_vector
     
-    def delete_document_vector(self, vector_id: int) -> bool:
+    def delete_document_vector(self, vector_id: UUID) -> bool:
         """Delete a document vector by ID."""
         vector = self.get_document_vector_by_id(vector_id)
         if vector:
@@ -58,7 +59,7 @@ class DocumentVectorDAO:
             return True
         return False
     
-    def delete_vectors_by_document_id(self, document_id: str) -> bool:
+    def delete_vectors_by_document_id(self, document_id: UUID) -> bool:
         """Delete all vectors for a specific document."""
         vectors = self.get_vectors_by_document_id(document_id)
         if vectors:
@@ -106,19 +107,19 @@ class DocumentVectorDAO:
         
         return filtered_vectors
     
-    def get_vectors_by_user_id(self, user_id: int) -> List[DocumentVector]:
+    def get_vectors_by_user_id(self, user_id: UUID) -> List[DocumentVector]:
         """Get all vectors for a specific user."""
         statement = select(DocumentVector).where(DocumentVector.user_id == user_id)
         result = self.session.exec(statement)
         return result.all()
     
-    def get_vectors_by_company_id(self, company_id: int) -> List[DocumentVector]:
+    def get_vectors_by_company_id(self, company_id: UUID) -> List[DocumentVector]:
         """Get all vectors for a specific company."""
         statement = select(DocumentVector).where(DocumentVector.company_id == company_id)
         result = self.session.exec(statement)
         return result.all()
     
-    def get_vectors_by_user_and_company(self, user_id: int, company_id: int) -> List[DocumentVector]:
+    def get_vectors_by_user_and_company(self, user_id: UUID, company_id: UUID) -> List[DocumentVector]:
         """Get all vectors for a specific user within a company."""
         statement = select(DocumentVector).where(
             DocumentVector.user_id == user_id,
