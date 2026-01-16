@@ -149,3 +149,88 @@ class HealthResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """Schema for error response."""
     detail: str
+
+
+# ==================== Chat Schemas ====================
+
+class ChatCreate(BaseModel):
+    """Schema for creating a chat."""
+    title: Optional[str] = None
+    user_id: UUID
+    company_id: Optional[UUID] = None
+
+
+class ChatUpdate(BaseModel):
+    """Schema for updating a chat."""
+    title: Optional[str] = None
+
+
+class ChatResponse(BaseModel):
+    """Schema for chat response."""
+    id: UUID
+    title: Optional[str] = None
+    user_id: UUID
+    company_id: Optional[UUID] = None
+    created_at: str
+    updated_at: str
+
+
+class ChatListResponse(BaseModel):
+    """Schema for chat list response."""
+    chats: List[ChatResponse]
+    total: int
+
+
+# ==================== ChatMessage Schemas ====================
+
+class ChatMessageCreate(BaseModel):
+    """Schema for creating a chat message."""
+    chat_id: UUID
+    chat_query: str
+    context_document: Optional[dict] = None
+    response: Optional[str] = None
+
+
+class ChatMessageUpdate(BaseModel):
+    """Schema for updating a chat message."""
+    chat_query: Optional[str] = None
+    context_document: Optional[dict] = None
+    response: Optional[str] = None
+
+
+class ChatMessageResponse(BaseModel):
+    """Schema for chat message response."""
+    id: UUID
+    chat_id: UUID
+    chat_query: str
+    context_document: Optional[dict] = None
+    response: Optional[str] = None
+    created_at: str
+
+
+class ChatMessageListResponse(BaseModel):
+    """Schema for chat message list response."""
+    messages: List[ChatMessageResponse]
+    total: int
+
+
+class ChatQueryRequest(BaseModel):
+    """Schema for chat query request."""
+    chat_id: UUID
+    query: str
+    use_retrieval: bool = True
+    top_k: int = 5
+    llm_model: Optional[str] = None
+    llm_provider: Optional[str] = None
+
+
+class ChatQueryResponse(BaseModel):
+    """Schema for chat query response."""
+    message_id: UUID
+    chat_id: UUID
+    query: str
+    response: str
+    context_documents: List[dict]
+    created_at: str
+    llm_model: str
+    llm_provider: str

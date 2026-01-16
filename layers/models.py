@@ -71,3 +71,45 @@ class DocumentVector(SQLModel, table=True):
     user_id: UUID = Field(default_factory=uuid4, index=True)
     company_id: Optional[UUID] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=get_current_utc_time)
+
+
+class Chat(SQLModel, table=True):
+    __tablename__ = "chats"
+
+    id: Optional[UUID] = Field(default_factory=uuid4, primary_key=True)
+    title: Optional[str] = Field(default=None)
+    
+    # Foreign key to user
+    user_id: UUID = Field(foreign_key="users.id", index=True)
+    
+    # Optional foreign key to company
+    company_id: Optional[UUID] = Field(default=None, foreign_key="companies.id", index=True)
+    
+    created_at: datetime = Field(default_factory=get_current_utc_time)
+    updated_at: datetime = Field(default_factory=get_current_utc_time)
+    
+    # Relationship to chat messages (one-to-many)
+    chat_messages: List["ChatMessage"] = Relationship(back_populates="chat")
+
+
+class ChatMessage(SQLModel, table=True):
+    __tablename__ = "chat_messages"
+
+    id: Optional[UUID] = Field(default_factory=uuid4, primary_key=True)
+    
+    # Foreign key to chat
+    chat_id: UUID = Field(foreign_key="chats.id", index=True)
+    
+    # The query given by the user in a given chat session
+    chat_query: str = Field(index=True)
+    
+    # Context document containing retrieved document id or text
+    context_document: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    
+    # The AI's response to the query
+    response: Optional[str] = Field(default=None)
+    
+    created_at: datetime = Field(default_factory=get_current_utc_time)
+    
+    # Relationship to chat (many-to-one)
+    chat: Chat = Relationship(back_populates="chat_messages")
