@@ -12,6 +12,41 @@ from layers.schemas import UserCreate, UserUpdate, UserResponse, UserCompanyResp
 router = APIRouter()
 
 
+@router.get("/company/{company_id}", response_model=List[UserResponse])
+async def get_users_by_company(
+    company_id: UUID,
+    session: Session = Depends(get_db_session)
+):
+    """
+    Get all users for a specific company.
+    
+    Args:
+        company_id: ID of the company to get users for
+        session: Database session
+        
+    Returns:
+        List of user responses
+    """
+    try:
+        user_dao = UserDAO(session)
+        users = user_dao.get_users_by_company(company_id)
+        return [
+            UserResponse(
+                id=user.id,
+                email=user.email,
+                name=user.name,
+                company_id=user.company_id,
+                created_at=user.created_at.isoformat()
+            )
+            for user in users
+        ]
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve users: {str(e)}"
+        )
+
+
 @router.post("/", response_model=UserResponse)
 async def create_user(
     user: UserCreate,

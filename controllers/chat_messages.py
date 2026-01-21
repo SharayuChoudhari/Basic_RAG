@@ -1,14 +1,51 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from layers.database import get_db_session
-from layers.schemas import ChatQueryRequest, ChatQueryResponse
+from layers.schemas import ChatQueryRequest, ChatQueryResponse, ChatMessageResponse
 from services.chat_messages import ChatMessageService
+from layers.dao import ChatMessageDAO
 
 # Create router
 router = APIRouter()
+
+
+@router.get("/chat/{chat_id}", response_model=List[ChatMessageResponse])
+async def get_messages_by_chat(
+    chat_id: UUID,
+    session: Session = Depends(get_db_session)
+):
+    """
+    Get all messages for a specific chat, ordered by creation time.
+    
+    Args:
+        chat_id: ID of the chat to get messages for
+        session: Database session
+        
+    Returns:
+        List of chat message responses
+    """
+    try:
+        chat_message_dao = ChatMessageDAO(session)
+        messages = chat_message_dao.get_messages_by_chat_ordered(chat_id)
+        return [
+            ChatMessageResponse(
+                id=msg.id,
+                chat_id=msg.chat_id,
+                chat_query=msg.chat_query,
+                context_document=msg.context_document,
+                response=msg.response,
+                created_at=msg.created_at.isoformat()
+            )
+            for msg in messages
+        ]
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve messages: {str(e)}"
+        )
 
 
 @router.post("/query", response_model=ChatQueryResponse)

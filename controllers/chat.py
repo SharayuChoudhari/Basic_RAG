@@ -1,14 +1,51 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from layers.database import get_db_session
 from layers.schemas import ChatCreate, ChatResponse
 from services.chat import ChatService
+from layers.dao import ChatDAO
 
 # Create router
 router = APIRouter()
+
+
+@router.get("/user/{user_id}", response_model=List[ChatResponse])
+async def get_chats_by_user(
+    user_id: UUID,
+    session: Session = Depends(get_db_session)
+):
+    """
+    Get all chats for a specific user.
+    
+    Args:
+        user_id: ID of the user to get chats for
+        session: Database session
+        
+    Returns:
+        List of chat responses
+    """
+    try:
+        chat_dao = ChatDAO(session)
+        chats = chat_dao.get_chats_by_user(user_id)
+        return [
+            ChatResponse(
+                id=chat.id,
+                title=chat.title,
+                user_id=chat.user_id,
+                company_id=chat.company_id,
+                created_at=chat.created_at.isoformat(),
+                updated_at=chat.updated_at.isoformat()
+            )
+            for chat in chats
+        ]
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve chats: {str(e)}"
+        )
 
 
 @router.post("/", response_model=ChatResponse)
