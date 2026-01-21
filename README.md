@@ -15,6 +15,9 @@ A FastAPI-based service for uploading PDF documents, creating embeddings, and st
 - **Vector Storage**: Store embeddings in PostgreSQL using pgvector
 - **Semantic Search**: Search for similar documents using vector similarity
 - **RESTful API**: Clean and well-documented FastAPI endpoints
+- **Local LLM Support**: Use local models like Ollama or HuggingFace for chat responses
+- **Multiple LLM Providers**: Support for OpenAI, Anthropic, Google, HuggingFace, Ollama, and local models
+- **Company-Specific LLM Config**: Each company can configure their preferred LLM provider
 
 ## Project Structure
 
@@ -42,6 +45,8 @@ Basic_RAG/
 - PostgreSQL with pgvector extension
 - (Optional) OpenAI API key for OpenAI embeddings
 - (Optional) HuggingFace API key for HuggingFace embeddings
+- (Optional) Ollama for local LLM support
+- (Optional) CUDA-capable GPU for local HuggingFace models
 
 ## Installation
 
@@ -94,7 +99,15 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 # HuggingFace Configuration (required if VECTORIZER_TYPE=huggingface)
 HUGGINGFACE_API_KEY=your_huggingface_api_key_here
+
+# LLM Provider Configuration (for chat functionality)
+OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+GOOGLE_API_KEY=your_google_api_key_here
+HUGGINGFACEHUB_API_TOKEN=your_huggingface_token_here
 ```
+
+For detailed information on configuring local models (Ollama, local HuggingFace), see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
 
 ## Running the Application
 
@@ -217,7 +230,38 @@ Update only the embedding model settings for a company.
 curl -X PUT "http://localhost:8000/api/v1/companies/1/embedding-model?embedding_model=text-embedding-ada-002&embedding_type=openai"
 ```
 
-#### 6. Delete Company
+#### 6. Update Company LLM Configuration
+
+**Endpoint**: `PUT /api/v1/companies/{company_id}/llm-config`
+
+Update the LLM configuration for a company (supports local models like Ollama).
+
+**Query Parameters**:
+- `llm_model` (required): Model name (e.g., "llama2", "mistral", "gpt-4")
+- `llm_provider` (required): Provider type (`openai`, `anthropic`, `google`, `huggingface`, `ollama`, `local_hf`)
+- `llm_endpoint` (optional): Endpoint URL for local models (e.g., "http://localhost:11434")
+- `llm_api_key` (optional): API key for cloud providers
+- `llm_temperature` (optional, default: 0.7): Temperature for generation
+- `llm_max_tokens` (optional): Max tokens for generation
+
+**Example using Ollama**:
+```bash
+curl -X PUT "http://localhost:8000/api/v1/companies/1/llm-config?llm_model=llama2&llm_provider=ollama&llm_endpoint=http://localhost:11434&llm_temperature=0.7"
+```
+
+**Example using local HuggingFace**:
+```bash
+curl -X PUT "http://localhost:8000/api/v1/companies/1/llm-config?llm_model=gpt2&llm_provider=local_hf&llm_temperature=0.8&llm_max_tokens=500"
+```
+
+**Example using OpenAI**:
+```bash
+curl -X PUT "http://localhost:8000/api/v1/companies/1/llm-config?llm_model=gpt-4&llm_provider=openai&llm_temperature=0.7"
+```
+
+For more details on local model setup, see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
+
+#### 7. Delete Company
 
 **Endpoint**: `DELETE /api/v1/companies/{company_id}`
 
@@ -352,7 +396,12 @@ curl -X GET "http://localhost:8000/api/v1/users/1/company"
   "name": "Acme Corp",
   "description": "Technology company",
   "embedding_model": "all-MiniLM-L6-v2",
-  "embedding_type": "local"
+  "embedding_type": "local",
+  "llm_model": "llama2",
+  "llm_provider": "ollama",
+  "llm_endpoint": "http://localhost:11434",
+  "llm_temperature": 0.7,
+  "llm_max_tokens": 1000
 }
 ```
 
@@ -776,6 +825,12 @@ If no `company_id` is provided, the system uses the default embedding model from
 | description | String | Company description |
 | embedding_model | String | Embedding model name (indexed) |
 | embedding_type | String | Embedding type (indexed) |
+| llm_model | String | LLM model name (indexed) |
+| llm_provider | String | LLM provider type (indexed) |
+| llm_endpoint | String | LLM endpoint URL (indexed, optional) |
+| llm_api_key | String | LLM API key (optional) |
+| llm_temperature | Float | LLM temperature setting |
+| llm_max_tokens | Integer | LLM max tokens setting (optional) |
 | created_at | Timestamp | Creation time |
 
 ## Development
@@ -810,6 +865,15 @@ Verify your `OPENAI_API_KEY` is set correctly in the `.env` file.
 
 ### PDF Extraction Issues
 Ensure the PDF file is not password-protected or corrupted.
+
+### Local Model Issues
+If you encounter issues with local models (Ollama, HuggingFace):
+1. Ensure Ollama is running: `curl http://localhost:11434/api/tags`
+2. Check if the model is downloaded: `ollama list`
+3. Verify you have enough RAM/VRAM for local HuggingFace models
+4. Check CUDA availability for GPU acceleration: `python -c "import torch; print(torch.cuda.is_available())"`
+
+For detailed troubleshooting, see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
 
 ## License
 

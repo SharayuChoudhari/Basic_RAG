@@ -17,6 +17,15 @@ class Company(SQLModel, table=True):
     description: Optional[str] = None
     embedding_model: str = Field(default="all-MiniLM-L6-v2", index=True)
     embedding_type: str = Field(default="local", index=True)  # local, openai, huggingface
+    
+    # LLM Configuration
+    llm_model: str = Field(default="gpt-4", index=True)  # Model name (e.g., "llama2", "mistral", "gpt-4")
+    llm_provider: str = Field(default="openai", index=True)  # Provider: openai, anthropic, google, huggingface, ollama, local_hf
+    llm_endpoint: Optional[str] = Field(default=None, index=True)  # Endpoint URL for local models (e.g., "http://localhost:11434")
+    llm_api_key: Optional[str] = Field(default=None)  # API key for cloud providers (stored securely)
+    llm_temperature: float = Field(default=0.7)  # Temperature for generation
+    llm_max_tokens: Optional[int] = Field(default=None)  # Max tokens for generation
+    
     created_at: datetime = Field(default_factory=get_current_utc_time)
     
     # Relationship to users (one-to-many)

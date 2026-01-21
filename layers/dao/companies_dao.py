@@ -78,3 +78,38 @@ class CompanyDAO:
         if company:
             return (company.embedding_model, company.embedding_type)
         return None
+    
+    def get_llm_config(self, company_id: UUID) -> Optional[dict]:
+        """Get the LLM configuration for a company."""
+        company = self.get_company_by_id(company_id)
+        if company:
+            return {
+                "llm_model": company.llm_model,
+                "llm_provider": company.llm_provider,
+                "llm_endpoint": company.llm_endpoint,
+                "llm_api_key": company.llm_api_key,
+                "llm_temperature": company.llm_temperature,
+                "llm_max_tokens": company.llm_max_tokens
+            }
+        return None
+    
+    def update_llm_config(self, company_id: UUID, llm_config: dict) -> Optional[Company]:
+        """Update the LLM configuration for a company."""
+        company = self.get_company_by_id(company_id)
+        if company:
+            if "llm_model" in llm_config:
+                company.llm_model = llm_config["llm_model"]
+            if "llm_provider" in llm_config:
+                company.llm_provider = llm_config["llm_provider"]
+            if "llm_endpoint" in llm_config:
+                company.llm_endpoint = llm_config["llm_endpoint"]
+            if "llm_api_key" in llm_config:
+                company.llm_api_key = llm_config["llm_api_key"]
+            if "llm_temperature" in llm_config:
+                company.llm_temperature = llm_config["llm_temperature"]
+            if "llm_max_tokens" in llm_config:
+                company.llm_max_tokens = llm_config["llm_max_tokens"]
+            self.session.add(company)
+            self.session.commit()
+            self.session.refresh(company)
+        return company

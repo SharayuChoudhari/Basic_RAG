@@ -293,7 +293,13 @@ async def get_user_company(
             "name": user.company.name,
             "description": user.company.description,
             "embedding_model": user.company.embedding_model,
-            "embedding_type": user.company.embedding_type
+            "embedding_type": user.company.embedding_type,
+            # LLM Configuration
+            "llm_model": user.company.llm_model,
+            "llm_provider": user.company.llm_provider,
+            "llm_endpoint": user.company.llm_endpoint,
+            "llm_temperature": user.company.llm_temperature,
+            "llm_max_tokens": user.company.llm_max_tokens
         }
     except HTTPException:
         raise

@@ -33,7 +33,14 @@ async def create_company(
             name=company.name,
             description=company.description,
             embedding_model=company.embedding_model,
-            embedding_type=company.embedding_type
+            embedding_type=company.embedding_type,
+            # LLM Configuration
+            llm_model=company.llm_model,
+            llm_provider=company.llm_provider,
+            llm_endpoint=company.llm_endpoint,
+            llm_api_key=company.llm_api_key,
+            llm_temperature=company.llm_temperature,
+            llm_max_tokens=company.llm_max_tokens
         )
         created_company = company_dao.create_company(new_company)
         
@@ -43,6 +50,12 @@ async def create_company(
             description=created_company.description,
             embedding_model=created_company.embedding_model,
             embedding_type=created_company.embedding_type,
+            # LLM Configuration
+            llm_model=created_company.llm_model,
+            llm_provider=created_company.llm_provider,
+            llm_endpoint=created_company.llm_endpoint,
+            llm_temperature=created_company.llm_temperature,
+            llm_max_tokens=created_company.llm_max_tokens,
             created_at=created_company.created_at.isoformat()
         )
     except Exception as e:
@@ -76,6 +89,12 @@ async def get_all_companies(
                 description=company.description,
                 embedding_model=company.embedding_model,
                 embedding_type=company.embedding_type,
+                # LLM Configuration
+                llm_model=company.llm_model,
+                llm_provider=company.llm_provider,
+                llm_endpoint=company.llm_endpoint,
+                llm_temperature=company.llm_temperature,
+                llm_max_tokens=company.llm_max_tokens,
                 created_at=company.created_at.isoformat()
             )
             for company in companies
@@ -118,6 +137,12 @@ async def get_company(
             description=company.description,
             embedding_model=company.embedding_model,
             embedding_type=company.embedding_type,
+            # LLM Configuration
+            llm_model=company.llm_model,
+            llm_provider=company.llm_provider,
+            llm_endpoint=company.llm_endpoint,
+            llm_temperature=company.llm_temperature,
+            llm_max_tokens=company.llm_max_tokens,
             created_at=company.created_at.isoformat()
         )
     except HTTPException:
@@ -165,6 +190,19 @@ async def update_company(
             company.embedding_model = company_update.embedding_model
         if company_update.embedding_type is not None:
             company.embedding_type = company_update.embedding_type
+        # Update LLM configuration fields if provided
+        if company_update.llm_model is not None:
+            company.llm_model = company_update.llm_model
+        if company_update.llm_provider is not None:
+            company.llm_provider = company_update.llm_provider
+        if company_update.llm_endpoint is not None:
+            company.llm_endpoint = company_update.llm_endpoint
+        if company_update.llm_api_key is not None:
+            company.llm_api_key = company_update.llm_api_key
+        if company_update.llm_temperature is not None:
+            company.llm_temperature = company_update.llm_temperature
+        if company_update.llm_max_tokens is not None:
+            company.llm_max_tokens = company_update.llm_max_tokens
         
         updated_company = company_dao.update_company(company)
         
@@ -174,6 +212,12 @@ async def update_company(
             description=updated_company.description,
             embedding_model=updated_company.embedding_model,
             embedding_type=updated_company.embedding_type,
+            # LLM Configuration
+            llm_model=updated_company.llm_model,
+            llm_provider=updated_company.llm_provider,
+            llm_endpoint=updated_company.llm_endpoint,
+            llm_temperature=updated_company.llm_temperature,
+            llm_max_tokens=updated_company.llm_max_tokens,
             created_at=updated_company.created_at.isoformat()
         )
     except HTTPException:
@@ -262,6 +306,12 @@ async def update_company_embedding_model(
             description=company.description,
             embedding_model=company.embedding_model,
             embedding_type=company.embedding_type,
+            # LLM Configuration
+            llm_model=company.llm_model,
+            llm_provider=company.llm_provider,
+            llm_endpoint=company.llm_endpoint,
+            llm_temperature=company.llm_temperature,
+            llm_max_tokens=company.llm_max_tokens,
             created_at=company.created_at.isoformat()
         )
     except HTTPException:
@@ -270,4 +320,72 @@ async def update_company_embedding_model(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to update embedding model: {str(e)}"
+        )
+
+
+@router.put("/{company_id}/llm-config")
+async def update_company_llm_config(
+    company_id: UUID,
+    llm_model: str,
+    llm_provider: str,
+    llm_endpoint: Optional[str] = None,
+    llm_api_key: Optional[str] = None,
+    llm_temperature: float = 0.7,
+    llm_max_tokens: Optional[int] = None,
+    session: Session = Depends(get_db_session)
+):
+    """
+    Update a company's LLM configuration settings.
+    
+    Args:
+        company_id: Company ID
+        llm_model: LLM model name (e.g., "llama2", "mistral", "gpt-4")
+        llm_provider: LLM provider (openai, anthropic, google, huggingface, ollama, local_hf)
+        llm_endpoint: Optional endpoint URL for local models (e.g., "http://localhost:11434")
+        llm_api_key: Optional API key for cloud providers
+        llm_temperature: Temperature for generation (default: 0.7)
+        llm_max_tokens: Optional max tokens for generation
+        session: Database session
+        
+    Returns:
+        Updated company
+    """
+    try:
+        company_dao = CompanyDAO(session)
+        llm_config = {
+            "llm_model": llm_model,
+            "llm_provider": llm_provider,
+            "llm_endpoint": llm_endpoint,
+            "llm_api_key": llm_api_key,
+            "llm_temperature": llm_temperature,
+            "llm_max_tokens": llm_max_tokens
+        }
+        company = company_dao.update_llm_config(company_id=company_id, llm_config=llm_config)
+        
+        if not company:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Company with ID {company_id} not found"
+            )
+        
+        return CompanyResponse(
+            id=company.id,
+            name=company.name,
+            description=company.description,
+            embedding_model=company.embedding_model,
+            embedding_type=company.embedding_type,
+            # LLM Configuration
+            llm_model=company.llm_model,
+            llm_provider=company.llm_provider,
+            llm_endpoint=company.llm_endpoint,
+            llm_temperature=company.llm_temperature,
+            llm_max_tokens=company.llm_max_tokens,
+            created_at=company.created_at.isoformat()
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update LLM configuration: {str(e)}"
         )

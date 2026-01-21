@@ -20,4 +20,16 @@ dependencies = [
     "requests>=2.31.0",
     "sentence-transformers>=2.2.0",
     "pydantic[email]>=2.1.0",
+    # LangChain and LLM providers
+    "langchain>=0.1.0",
+    "langchain-openai>=0.0.5",
+    "langchain-anthropic>=0.1.0",
+    "langchain-google-genai>=1.0.0",
+    "langchain-community>=0.0.20",
+    "langchain-huggingface>=0.0.1",
+    "langgraph>=0.0.20",
+    # Local model support
+    "ollama>=0.1.0",
+    "transformers>=4.36.0",
+    "torch>=2.1.0",
 ]

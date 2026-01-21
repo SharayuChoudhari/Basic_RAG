@@ -4,6 +4,8 @@ from layers.database import create_db_and_tables
 from controllers.document_embedding import router as document_embedding_router
 from controllers.companies import router as companies_router
 from controllers.users import router as users_router
+from controllers.chat import router as chat_router
+from controllers.chat_messages import router as chat_messages_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -25,6 +27,8 @@ app.add_middleware(
 app.include_router(document_embedding_router, prefix="/api/v1/documents", tags=["documents"])
 app.include_router(companies_router, prefix="/api/v1/companies", tags=["companies"])
 app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
+app.include_router(chat_router, prefix="/api/v1/chats", tags=["chats"])
+app.include_router(chat_messages_router, prefix="/api/v1/chat-messages", tags=["chat-messages"])
 
 
 @app.on_event("startup")
@@ -41,7 +45,9 @@ def read_root():
         "version": "0.1.0",
         "endpoints": {
             "upload_pdf": "/api/v1/documents/upload",
-            "health": "/health"
+            "health": "/health",
+            "chats": "/api/v1/chats",
+            "chat_messages": "/api/v1/chat-messages"
         }
     }
 

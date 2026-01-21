@@ -12,6 +12,13 @@ class CompanyCreate(BaseModel):
     description: Optional[str] = None
     embedding_model: str = "all-MiniLM-L6-v2"
     embedding_type: str = "local"
+    # LLM Configuration
+    llm_model: str = "gpt-4"
+    llm_provider: str = "openai"
+    llm_endpoint: Optional[str] = None
+    llm_api_key: Optional[str] = None
+    llm_temperature: float = 0.7
+    llm_max_tokens: Optional[int] = None
 
 
 class CompanyUpdate(BaseModel):
@@ -20,6 +27,13 @@ class CompanyUpdate(BaseModel):
     description: Optional[str] = None
     embedding_model: Optional[str] = None
     embedding_type: Optional[str] = None
+    # LLM Configuration
+    llm_model: Optional[str] = None
+    llm_provider: Optional[str] = None
+    llm_endpoint: Optional[str] = None
+    llm_api_key: Optional[str] = None
+    llm_temperature: Optional[float] = None
+    llm_max_tokens: Optional[int] = None
 
 
 class CompanyResponse(BaseModel):
@@ -29,6 +43,13 @@ class CompanyResponse(BaseModel):
     description: Optional[str] = None
     embedding_model: str
     embedding_type: str
+    # LLM Configuration
+    llm_model: str
+    llm_provider: str
+    llm_endpoint: Optional[str] = None
+    llm_api_key: Optional[str] = None
+    llm_temperature: float
+    llm_max_tokens: Optional[int] = None
     created_at: str
 
 
@@ -64,6 +85,13 @@ class UserCompanyResponse(BaseModel):
     description: Optional[str] = None
     embedding_model: str
     embedding_type: str
+    # LLM Configuration
+    llm_model: str
+    llm_provider: str
+    llm_endpoint: Optional[str] = None
+    llm_api_key: Optional[str] = None
+    llm_temperature: float
+    llm_max_tokens: Optional[int] = None
 
 
 # ==================== Document Schemas ====================
@@ -222,6 +250,7 @@ class ChatQueryRequest(BaseModel):
     top_k: int = 5
     llm_model: Optional[str] = None
     llm_provider: Optional[str] = None
+    max_history: int = 10  # Maximum number of previous messages to include in context
 
 
 class ChatQueryResponse(BaseModel):
