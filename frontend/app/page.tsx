@@ -5,6 +5,7 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useUsers } from '@/hooks/useUsers';
 import { useChats } from '@/hooks/useChats';
 import { useMessages } from '@/hooks/useMessages';
+import { useDocuments } from '@/hooks/useDocuments';
 import { useApp } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { CompanyUserSelector } from '@/components/CompanyUserSelector';
@@ -17,7 +18,8 @@ function ChatPage() {
   const { setDemoUser } = useAuth();
   const { companies } = useCompanies();
   const { users } = useUsers(selectedCompany?.id);
-  const { chats, createNewChat, removeChat } = useChats(selectedUser?.id || null);
+  const { chats, createNewChat, removeChat, renameChat } = useChats(selectedUser?.id || null);
+  const { documents } = useDocuments(selectedCompany?.id || null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const { messages, sendMessage, sending } = useMessages(selectedChatId);
 
@@ -36,8 +38,8 @@ function ChatPage() {
     setSelectedChatId(null);
   };
 
-  const handleNewChat = async () => {
-    const newChat = await createNewChat('New Chat', selectedCompany?.id);
+  const handleNewChat = async (selectedDocumentIds?: string[]) => {
+    const newChat = await createNewChat('New Chat', selectedCompany?.id, selectedDocumentIds);
     setSelectedChatId(newChat.id);
   };
 
@@ -47,7 +49,17 @@ function ChatPage() {
 
   const handleSendMessage = async (query: string) => {
     if (!selectedUser) return;
-    await sendMessage(selectedUser.id, query);
+    await sendMessage(selectedUser.id, query, handleFirstMessage);
+  };
+
+  const handleFirstMessage = async (query: string) => {
+    if (!selectedChatId) return;
+    const first7Words = query.split(' ').slice(0, 7).join(' ');
+    await renameChat(selectedChatId, first7Words);
+  };
+
+  const handleRenameChat = async (chatId: string, newTitle: string) => {
+    await renameChat(chatId, newTitle);
   };
 
   const selectedChat = chats.find((c) => c.id === selectedChatId);
@@ -58,22 +70,19 @@ function ChatPage() {
         <h1 className="text-2xl font-bold">RAG Chatbot</h1>
       </header>
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-80 flex-shrink-0 border-r overflow-y-auto">
-          <CompanyUserSelector
-            selectedCompany={selectedCompany}
-            selectedUser={selectedUser}
-            onCompanyChange={handleCompanyChange}
-            onUserChange={handleUserChange}
-          />
+        <div className="w-80 flex-shrink-0 border-r flex flex-col">
+          <CompanyUserSelector />
           <div className="p-4">
             <FileUpload />
           </div>
           <ChatSidebar
             selectedChatId={selectedChatId}
             chats={chats}
+            documents={documents}
             onSelectChat={handleSelectChat}
             onNewChat={handleNewChat}
             onDeleteChat={removeChat}
+            onRenameChat={handleRenameChat}
           />
         </div>
         <ChatInterface

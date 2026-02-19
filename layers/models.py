@@ -94,6 +94,12 @@ class Chat(SQLModel, table=True):
     # Optional foreign key to company
     company_id: Optional[UUID] = Field(default=None, foreign_key="companies.id", index=True)
     
+    # Selected document IDs for this chat (null/empty means all documents)
+    selected_document_ids: Optional[List[UUID]] = Field(
+        default=None,
+        sa_column=Column(JSONB)
+    )
+    
     created_at: datetime = Field(default_factory=get_current_utc_time)
     updated_at: datetime = Field(default_factory=get_current_utc_time)
     
@@ -117,6 +123,9 @@ class ChatMessage(SQLModel, table=True):
     
     # The AI's response to the query
     response: Optional[str] = Field(default=None)
+    
+    # Status of message processing: "processing" | "done" | "error"
+    status: str = Field(default="processing", nullable=False)
     
     created_at: datetime = Field(default_factory=get_current_utc_time)
     

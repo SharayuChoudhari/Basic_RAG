@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchChatsByUser, createChat, deleteChat } from '@/lib/api';
+import { fetchChatsByUser, createChat, deleteChat, renameChat as renameChatApi } from '@/lib/api';
 import { Chat } from '@/types/api';
 
 export function useChats(userId: string | null) {
@@ -20,9 +20,9 @@ export function useChats(userId: string | null) {
     }
   };
 
-  const createNewChat = async (title?: string, companyId?: string) => {
+  const createNewChat = async (title?: string, companyId?: string, selectedDocumentIds?: string[]) => {
     if (!userId) throw new Error('No user selected');
-    const newChat = await createChat(userId, title, companyId);
+    const newChat = await createChat(userId, title, companyId, selectedDocumentIds);
     setChats((prev) => [newChat, ...prev]);
     return newChat;
   };
@@ -32,9 +32,18 @@ export function useChats(userId: string | null) {
     setChats((prev) => prev.filter((c) => c.id !== chatId));
   };
 
+  const renameChat = async (chatId: string, newTitle: string) => {
+    const updatedChat = await renameChatApi(chatId, newTitle);
+    setChats((prev) => prev.map((c) => (c.id === chatId ? updatedChat : c)));
+  };
+
+  const updateChatTitle = (chatId: string, newTitle: string) => {
+    setChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, title: newTitle } : c)));
+  };
+
   useEffect(() => {
     refresh();
   }, [userId]);
 
-  return { chats, loading, error, refresh, createNewChat, removeChat };
+  return { chats, loading, error, refresh, createNewChat, removeChat, renameChat, updateChatTitle };
 }

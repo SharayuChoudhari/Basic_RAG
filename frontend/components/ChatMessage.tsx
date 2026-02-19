@@ -3,8 +3,8 @@
 import { ChatMessage as ChatMessageType } from '@/types/api';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Bot, User } from 'lucide-react';
-import { ReferenceCard } from './ReferenceCard';
+import { Bot, User, Loader2 } from 'lucide-react';
+import { ReferenceCard } from '@/components/ReferenceCard';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -13,6 +13,8 @@ interface ChatMessageProps {
 export function ChatMessage({ message }: ChatMessageProps) {
   const references = message.context_document?.documents || [];
   const hasResponse = !!message.response;
+  const isProcessing = message.status === 'processing';
+  const isError = message.status === 'error';
 
   return (
     <div className="space-y-4">
@@ -36,7 +38,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       </div>
 
       {/* AI Response Bubble */}
-      {hasResponse && (
+      {isProcessing && (
         <div className="flex gap-3 justify-start">
           <Avatar className="w-8 h-8 flex-shrink-0">
             <AvatarFallback>
@@ -44,7 +46,36 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </AvatarFallback>
           </Avatar>
           <div className="max-w-[80%]">
-            <Card className="p-4 bg-muted">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Processing...</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {isError && (
+        <div className="flex gap-3 justify-start">
+          <Avatar className="w-8 h-8 flex-shrink-0">
+            <AvatarFallback>
+              <Bot className="w-5 h-5" />
+            </AvatarFallback>
+          </Avatar>
+          <div className="max-w-[80%]">
+            <div className="text-destructive">
+              Failed to generate response. Please try again.
+            </div>
+          </div>
+        </div>
+      )}
+      {!isProcessing && !isError && hasResponse && (
+        <div className="flex gap-3 justify-start">
+          <Avatar className="w-8 h-8 flex-shrink-0">
+            <AvatarFallback>
+              <Bot className="w-5 h-5" />
+            </AvatarFallback>
+          </Avatar>
+          <div className="max-w-[80%]">
+            <Card className="p-4">
               <div className="whitespace-pre-wrap break-words">
                 {message.response}
               </div>

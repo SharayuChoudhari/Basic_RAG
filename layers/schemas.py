@@ -160,6 +160,19 @@ class DocumentSearchResponse(BaseModel):
     num_results: int
     results: List[DocumentSearchResult]
 
+class DocumentInfo(BaseModel):
+    """Schema for document information."""
+    document_id: UUID
+    filename: str
+    num_chunks: int
+    created_at: str
+    metadata: Optional[dict] = None
+
+class DocumentListResponse(BaseModel):
+    """Schema for document list response."""
+    documents: List[DocumentInfo]
+    total: int
+
 
 # ==================== Common Schemas ====================
 
@@ -186,6 +199,8 @@ class ChatCreate(BaseModel):
     title: Optional[str] = None
     user_id: UUID
     company_id: Optional[UUID] = None
+    # Optional list of document IDs to use for retrieval
+    selected_document_ids: Optional[List[UUID]] = None
 
 
 class ChatUpdate(BaseModel):
@@ -199,6 +214,8 @@ class ChatResponse(BaseModel):
     title: Optional[str] = None
     user_id: UUID
     company_id: Optional[UUID] = None
+    # Selected document IDs
+    selected_document_ids: Optional[List[UUID]] = None
     created_at: str
     updated_at: str
 

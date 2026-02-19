@@ -35,6 +35,12 @@ class ChatDAO:
         result = self.session.exec(statement)
         return result.all()
     
+    def get_chats_by_user_ordered(self, user_id: UUID) -> List[Chat]:
+        """Get all chats for a specific user, ordered by creation date (newest first)."""
+        statement = select(Chat).where(Chat.user_id == user_id).order_by(Chat.created_at.desc())
+        result = self.session.exec(statement)
+        return result.all()
+    
     def get_chats_by_company(self, company_id: UUID) -> List[Chat]:
         """Get all chats for a specific company."""
         statement = select(Chat).where(Chat.company_id == company_id)

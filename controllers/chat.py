@@ -4,9 +4,9 @@ from typing import Optional, List
 from uuid import UUID
 
 from layers.database import get_db_session
-from layers.schemas import ChatCreate, ChatResponse
+from layers.schemas import ChatCreate, ChatResponse, DocumentListResponse
 from services.chat import ChatService
-from layers.dao import ChatDAO
+from layers.dao import ChatDAO, DocumentVectorDAO
 
 # Create router
 router = APIRouter()
@@ -29,7 +29,7 @@ async def get_chats_by_user(
     """
     try:
         chat_dao = ChatDAO(session)
-        chats = chat_dao.get_chats_by_user(user_id)
+        chats = chat_dao.get_chats_by_user_ordered(user_id)
         return [
             ChatResponse(
                 id=chat.id,
@@ -152,4 +152,43 @@ async def delete_chat(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to delete chat: {str(e)}"
+        )
+
+
+@router.get("/documents/company/{company_id}", response_model=DocumentListResponse)
+async def get_documents_by_company(
+    company_id: UUID,
+    session: Session = Depends(get_db_session)
+):
+    """
+    Get all unique documents for a specific company.
+    
+    Args:
+        company_id: ID of the company
+        session: Database session
+        
+    Returns:
+        List of documents with metadata
+    """
+    try:
+        document_vector_dao = DocumentVectorDAO(session)
+        documents = document_vector_dao.get_unique_documents_by_company(company_id)
+        
+        return DocumentListResponse(
+            documents=[
+                {
+                    "document_id": doc['document_id'],
+                    "filename": doc['filename'],
+                    "num_chunks": doc['num_chunks'],
+                    "created_at": doc['created_at'],
+                    "metadata": doc['metadata']
+                }
+                for doc in documents
+            ],
+            total=len(documents)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve documents: {str(e)}"
         )

@@ -25,8 +25,23 @@ export interface Chat {
   title: string | null;
   user_id: string;
   company_id: string | null;
+  selected_document_ids: string[] | null;  // NEW
   created_at: string;
   updated_at: string;
+}
+
+// Document types
+export interface DocumentInfo {
+  document_id: string;
+  filename: string;
+  num_chunks: number;
+  created_at: string;
+  metadata: Record<string, any> | null;
+}
+
+export interface DocumentListResponse {
+  documents: DocumentInfo[];
+  total: number;
 }
 
 // Chat Message types
@@ -37,6 +52,7 @@ export interface ChatMessage {
   context_document: Record<string, any> | null;
   response: string | null;
   created_at: string;
+  status?: string;  // NEW: "processing" | "done" | "error"
 }
 
 // Query Response types

@@ -224,6 +224,7 @@ Formatting requirements:
         query: str, 
         user_id: UUID, 
         company_id: Optional[UUID] = None,
+        selected_document_ids: Optional[List[UUID]] = None,
         top_k: int = 5
     ) -> List[Dict[str, Any]]:
         """
@@ -233,6 +234,7 @@ Formatting requirements:
             query: The user's query
             user_id: ID of the user
             company_id: Optional ID of the company
+            selected_document_ids: Optional list of document IDs to filter by
             top_k: Number of top results to retrieve
             
         Returns:
@@ -258,9 +260,19 @@ Formatting requirements:
         query_embedding = vectorizer.embed(query)
         
         # Get documents for the user/company
-        statement = select(DocumentVector).where(DocumentVector.user_id == user_id)
-        if company_id:
-            statement = statement.where(DocumentVector.company_id == company_id)
+        if selected_document_ids:
+            # Filter by selected document IDs
+            statement = select(DocumentVector).where(
+                DocumentVector.user_id == user_id,
+                DocumentVector.document_id.in_(selected_document_ids)
+            )
+            if company_id:
+                statement = statement.where(DocumentVector.company_id == company_id)
+        else:
+            # Get all documents for the user/company
+            statement = select(DocumentVector).where(DocumentVector.user_id == user_id)
+            if company_id:
+                statement = statement.where(DocumentVector.company_id == company_id)
         
         result = self.session.exec(statement)
         all_docs = result.all()
@@ -354,6 +366,9 @@ Formatting requirements:
         if not chat:
             raise ValueError(f"Chat with ID {query_request.chat_id} not found")
         
+        # Get selected document IDs from chat
+        selected_document_ids = getattr(chat, 'selected_document_ids', None)
+        
         # Determine LLM model and provider
         llm_model = query_request.llm_model
         llm_provider = query_request.llm_provider
@@ -378,6 +393,7 @@ Formatting requirements:
                 query=query_request.query,
                 user_id=chat.user_id,
                 company_id=chat.company_id,
+                selected_document_ids=selected_document_ids,  # Pass selected documents
                 top_k=query_request.top_k
             )
         
@@ -402,26 +418,26 @@ Formatting requirements:
         # Run the workflow
         result = await self.workflow.ainvoke(state)
         
-        # Create chat message
+        # Create chat message with the response from the workflow
         new_message = ChatMessage(
             chat_id=query_request.chat_id,
             chat_query=query_request.query,
             context_document={"documents": context_documents} if context_documents else None,
-            response=result["response"],
+            response=result["response"],  # Use the response from the workflow
             created_at=get_current_utc_time()
         )
-        
-        # Save to database
-        created_message = self.chat_message_dao.create_chat_message(new_message)
+        self.session.add(new_message)
+        self.session.commit()
+        self.session.refresh(new_message)
         
         # Return response
         return ChatQueryResponse(
-            message_id=created_message.id,
-            chat_id=created_message.chat_id,
-            query=created_message.chat_query,
-            response=created_message.response or "",
+            message_id=new_message.id,
+            chat_id=new_message.chat_id,
+            query=new_message.chat_query,
+            response=new_message.response or "",
             context_documents=context_documents,
-            created_at=created_message.created_at.isoformat(),
+            created_at=new_message.created_at.isoformat(),
             llm_model=llm_model,
             llm_provider=llm_provider
         )

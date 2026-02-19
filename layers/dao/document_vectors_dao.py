@@ -127,3 +127,60 @@ class DocumentVectorDAO:
         )
         result = self.session.exec(statement)
         return result.all()
+    
+    def get_unique_documents_by_company(self, company_id: UUID) -> List[Dict[str, Any]]:
+        """Get unique documents for a company with their metadata."""
+        from sqlalchemy import func
+        
+        # Group by document_id and get first chunk's metadata
+        statement = (
+            select(
+                DocumentVector.document_id,
+                func.min(DocumentVector.created_at).label('created_at'),
+                func.count(DocumentVector.id).label('num_chunks')
+            )
+            .where(DocumentVector.company_id == company_id)
+            .group_by(DocumentVector.document_id)
+            .order_by(func.min(DocumentVector.created_at).desc())
+        )
+        
+        result = self.session.exec(statement)
+        documents = []
+        
+        for row in result:
+            # Get metadata from first chunk
+            first_chunk = (
+                select(DocumentVector)
+                    .where(
+                        DocumentVector.document_id == row.document_id,
+                        DocumentVector.company_id == company_id
+                    )
+                    .order_by(DocumentVector.chunk_index)
+                    .limit(1)
+            )
+            chunk_result = self.session.exec(first_chunk).first()
+            
+            if chunk_result and chunk_result.meta_data:
+                filename = chunk_result.meta_data.get('filename', 'Unknown')
+                metadata = chunk_result.meta_data
+            else:
+                filename = 'Unknown'
+                metadata = None
+            
+            documents.append({
+                'document_id': row.document_id,
+                'filename': filename,
+                'num_chunks': row.num_chunks,
+                'created_at': row.created_at.isoformat() if row.created_at else '',
+                'metadata': metadata
+            })
+        
+        return documents
+    
+    def get_vectors_by_document_ids(self, document_ids: List[UUID]) -> List[DocumentVector]:
+        """Get all vectors for specific document IDs."""
+        statement = select(DocumentVector).where(
+            DocumentVector.document_id.in_(document_ids)
+        )
+        result = self.session.exec(statement)
+        return result.all()
