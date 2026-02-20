@@ -131,3 +131,81 @@ class ChatMessage(SQLModel, table=True):
     
     # Relationship to chat (many-to-one)
     chat: Chat = Relationship(back_populates="chat_messages")
+
+
+class EvaluationJob(SQLModel, table=True):
+    """Tracks batch evaluation runs with aggregated scores."""
+    __tablename__ = "evaluation_jobs"
+
+    id: Optional[UUID] = Field(default_factory=uuid4, primary_key=True)
+    
+    # Foreign key to company (company-scoped evaluations)
+    company_id: Optional[UUID] = Field(default=None, foreign_key="companies.id", index=True)
+    
+    # Job status: pending, running, completed, failed
+    status: str = Field(default="pending", nullable=False, index=True)
+    
+    # Total number of queries evaluated
+    total_queries: int = Field(default=0)
+    
+    # Aggregated metric scores
+    avg_faithfulness: Optional[float] = Field(default=None)
+    avg_answer_relevance: Optional[float] = Field(default=None)
+    avg_context_precision: Optional[float] = Field(default=None)
+    overall_score: Optional[float] = Field(default=None)
+    
+    # Timestamps
+    started_at: Optional[datetime] = Field(default=None)
+    completed_at: Optional[datetime] = Field(default=None)
+    
+    # Error details if failed
+    error_message: Optional[str] = Field(default=None)
+    
+    # Configuration snapshot used for this job
+    config_snapshot: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    
+    created_at: datetime = Field(default_factory=get_current_utc_time)
+    
+    # Relationship to evaluation results (one-to-many)
+    results: List["EvaluationResult"] = Relationship(back_populates="job")
+
+
+class EvaluationResult(SQLModel, table=True):
+    """Stores per-query evaluation scores."""
+    __tablename__ = "evaluation_results"
+
+    id: Optional[UUID] = Field(default_factory=uuid4, primary_key=True)
+    
+    # Foreign key to evaluation job (nullable for real-time evaluations)
+    job_id: Optional[UUID] = Field(default=None, foreign_key="evaluation_jobs.id", index=True)
+    
+    # Foreign key to chat message (the query being evaluated)
+    chat_message_id: Optional[UUID] = Field(default=None, foreign_key="chat_messages.id", index=True)
+    
+    # Foreign key to company (for filtering)
+    company_id: Optional[UUID] = Field(default=None, foreign_key="companies.id", index=True)
+    
+    # The user query
+    question: str = Field(index=True)
+    
+    # Retrieved document contents
+    retrieved_contexts: Optional[List[str]] = Field(default=None, sa_column=Column(JSONB))
+    
+    # The generated response
+    answer: Optional[str] = Field(default=None)
+    
+    # RAGAS metric scores
+    faithfulness_score: Optional[float] = Field(default=None)
+    answer_relevance_score: Optional[float] = Field(default=None)
+    context_precision_score: Optional[float] = Field(default=None)
+    
+    # Overall score (average of available metrics)
+    overall_score: Optional[float] = Field(default=None)
+    
+    # Additional metadata
+    evaluation_metadata: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    
+    created_at: datetime = Field(default_factory=get_current_utc_time)
+    
+    # Relationship to evaluation job (many-to-one)
+    job: Optional[EvaluationJob] = Relationship(back_populates="results")
