@@ -1,884 +1,738 @@
-# Basic RAG - Document Embedding API
+<div align="center">
 
-A FastAPI-based service for uploading PDF documents, creating embeddings, and storing them in a PostgreSQL database with pgvector support for semantic search.
+# 🔍 Basic RAG
 
-## Features
+**A full-stack Retrieval-Augmented Generation system**
 
-- **PDF Upload**: Upload PDF files and automatically extract text
-- **Batch Upload**: Upload multiple PDF files in a single request
-- **File Validation**: Comprehensive validation for file size, type, and content
-- **PDF Metadata Extraction**: Automatically extract title, author, page count, and more
-- **Preview Mode**: Preview extracted text before creating embeddings
-- **Text Cleaning**: Optional text normalization and cleaning
-- **Document Chunking**: Intelligent text chunking with configurable size and overlap
-- **Multiple Vectorizers**: Support for local, OpenAI, and HuggingFace embeddings
-- **Vector Storage**: Store embeddings in PostgreSQL using pgvector
-- **Semantic Search**: Search for similar documents using vector similarity
-- **RESTful API**: Clean and well-documented FastAPI endpoints
-- **Local LLM Support**: Use local models like Ollama or HuggingFace for chat responses
-- **Multiple LLM Providers**: Support for OpenAI, Anthropic, Google, HuggingFace, Ollama, and local models
-- **Company-Specific LLM Config**: Each company can configure their preferred LLM provider
+[![Python](https://img.shields.io/badge/Python-3.13+-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Next.js-15-000000?style=flat&logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL+pgvector-14+-336791?style=flat&logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
+[![LangGraph](https://img.shields.io/badge/LangGraph-powered-FF6B35?style=flat)](https://github.com/langchain-ai/langgraph)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](LICENSE)
 
-## Project Structure
+Upload PDFs → Embed & Store → Chat with your documents
+
+[Features](#-features) · [Quick Start](#-quick-start) · [Workflow](#-workflow) · [API Reference](#-api-reference) · [Frontend](#-frontend) · [Evaluation](#-ragas-evaluation-pipeline)
+
+</div>
+
+---
+
+## ✨ Features
+
+| | Feature | Details |
+|---|---|---|
+| 📄 | **Document Ingestion** | Upload single or batch PDFs; auto-extract, clean, chunk, and embed |
+| 🧠 | **Multiple Embedding Models** | Local (`sentence-transformers`), OpenAI, HuggingFace Inference API |
+| 🏢 | **Multi-Tenant** | Per-company embedding model and LLM configuration |
+| 🗄️ | **Vector Storage** | PostgreSQL + `pgvector` with variable-length vectors and JSONB metadata |
+| 🔍 | **Semantic Search** | Cosine-similarity search over stored document chunks |
+| 💬 | **Conversational Chat** | LangGraph workflow: retrieval → generation with conversation history |
+| 🤖 | **Multiple LLM Providers** | OpenAI, Anthropic, Google Gemini, HuggingFace, Ollama, local HF pipeline |
+| 📌 | **Document Scoping** | Pin a chat to specific documents for focused retrieval |
+| 📊 | **RAG Evaluation** | RAGAS metrics: Faithfulness, Answer Relevance, Context Precision |
+| 🖥️ | **React Frontend** | Next.js 15 + Tailwind CSS + shadcn/ui chat interface |
+
+---
+
+## 🏗️ Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                     Frontend  (Next.js 15)                       │
+│   CompanySelector ─ ChatSidebar ─ ChatInterface ─ FileUpload     │
+└───────────────────────────┬──────────────────────────────────────┘
+                            │  REST / JSON
+┌───────────────────────────▼──────────────────────────────────────┐
+│                     Backend  (FastAPI)                           │
+│                                                                  │
+│   ┌──────────────────────────────────────────────────────────┐  │
+│   │  📥 Document Upload Pipeline                            │  │
+│   │  PDF ──► text extract ──► clean & chunk ──► vectorize   │  │
+│   │       ──► store DocumentVector rows (pgvector)          │  │
+│   └──────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│   ┌──────────────────────────────────────────────────────────┐  │
+│   │  💬 Chat Query Pipeline  (LangGraph)                    │  │
+│   │  query ──► embed ──► cosine search ──► top-k chunks     │  │
+│   │        ──► LLM generation ──► persist ChatMessage       │  │
+│   └──────────────────────────────────────────────────────────┘  │
+└───────────────────────────┬──────────────────────────────────────┘
+                            │
+┌───────────────────────────▼──────────────────────────────────────┐
+│         PostgreSQL + pgvector  (Database)                        │
+│  companies · users · document_vectors · chats · chat_messages    │
+│  evaluation_jobs · evaluation_results                            │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📁 Project Structure
 
 ```
 Basic_RAG/
-├── main.py                          # FastAPI application entry point
-├── controllers/
-│   └── document_embedding.py        # API endpoints for document operations
-├── services/
-│   ├── document_embedding.py        # Document embedding service
-│   └── vectorizer.py                # Vectorizer implementations
-├── layers/
-│   ├── database.py                  # Database configuration
-│   ├── models.py                    # SQLModel database models
-│   └── dao/
-│       └── document_vectors_dao.py  # Data access object for document vectors
-├── alembic/                         # Database migrations
-├── .env.example                     # Environment variables template
-└── pyproject.toml                   # Project dependencies
+├── main.py                         # FastAPI app, router registration
+├── pyproject.toml                  # Dependencies
+├── .env.example                    # Environment variable template
+├── alembic.ini                     # Migration config
+│
+├── controllers/                    # HTTP layer
+│   ├── companies.py
+│   ├── users.py
+│   ├── document_embedding.py
+│   ├── chat.py
+│   └── chat_messages.py
+│
+├── services/                       # Business logic
+│   ├── document_embedding.py       # PDF extract → chunk → embed
+│   ├── vectorizer.py               # Local / OpenAI / HuggingFace
+│   ├── chat.py                     # Chat CRUD
+│   └── chat_messages.py            # LangGraph RAG workflow
+│
+├── layers/                         # Data layer
+│   ├── database.py                 # SQLModel engine & session
+│   ├── models.py                   # ORM models
+│   ├── schemas.py                  # Pydantic schemas
+│   └── dao/                        # Data access objects
+│
+├── alembic/versions/               # Migration scripts
+│
+├── evaluations/                    # RAGAS evaluation pipeline
+│   ├── single_eval.py
+│   ├── batch_runner.py
+│   ├── dataset_loader.py
+│   ├── metrics_store.py
+│   ├── run_evaluations.py          # CLI entry point
+│   └── results/                    # JSON output files
+│
+├── frontend/                       # Next.js frontend
+│   ├── app/                        # App Router pages
+│   ├── components/                 # React components
+│   ├── hooks/                      # Custom React hooks
+│   └── contexts/                   # React context providers
+│
+└── docs/                           # Additional documentation
 ```
 
-## Prerequisites
+---
 
-- Python 3.13 or higher
-- PostgreSQL with pgvector extension
-- (Optional) OpenAI API key for OpenAI embeddings
-- (Optional) HuggingFace API key for HuggingFace embeddings
-- (Optional) Ollama for local LLM support
-- (Optional) CUDA-capable GPU for local HuggingFace models
+## ⚡ Quick Start
 
-## Installation
+### Prerequisites
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd Basic_RAG
-   ```
+- Python 3.13+
+- PostgreSQL 14+ with the `pgvector` extension
+- Node.js 18+ (for the frontend)
+- [`uv`](https://github.com/astral-sh/uv) (recommended) or `pip`
 
-2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   # or using uv
-   uv sync
-   ```
-
-3. **Set up PostgreSQL with pgvector**:
-   ```sql
-   CREATE EXTENSION IF NOT EXISTS vector;
-   ```
-
-4. **Configure environment variables**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-5. **Run database migrations**:
-   ```bash
-   alembic upgrade head
-   ```
-
-## Configuration
-
-Create a `.env` file based on `.env.example`:
-
-```env
-# Database Configuration
-DATABASE_URL=postgresql://user:password@localhost:5432/dbname
-
-# Vectorizer Configuration
-# Options: local, openai, huggingface
-VECTORIZER_TYPE=local
-
-# Local Vectorizer Configuration
-VECTORIZER_MODEL=all-MiniLM-L6-v2
-
-# OpenAI Configuration (required if VECTORIZER_TYPE=openai)
-OPENAI_API_KEY=your_openai_api_key_here
-
-# HuggingFace Configuration (required if VECTORIZER_TYPE=huggingface)
-HUGGINGFACE_API_KEY=your_huggingface_api_key_here
-
-# LLM Provider Configuration (for chat functionality)
-OPENAI_API_KEY=your_openai_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-GOOGLE_API_KEY=your_google_api_key_here
-HUGGINGFACEHUB_API_TOKEN=your_huggingface_token_here
+```sql
+-- Enable pgvector in your database
+CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-For detailed information on configuring local models (Ollama, local HuggingFace), see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
-
-## Running the Application
-
-Start the FastAPI server:
+### Backend
 
 ```bash
-python main.py
-# or using uvicorn directly
+# 1. Clone and enter the project
+git clone <repository-url> && cd Basic_RAG
+
+# 2. Install Python dependencies
+uv sync          # recommended
+# pip install -e .  # or with pip
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env with your DATABASE_URL and API keys
+
+# 4. Run migrations
+alembic upgrade head
+
+# 5. Start the API server
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The API will be available at `http://localhost:8000`
+> **API Docs**: http://localhost:8000/docs  
+> **ReDoc**: http://localhost:8000/redoc
 
-## API Documentation
+### Frontend
 
-Once the server is running, visit:
-- **Swagger UI**: `http://localhost:8000/docs`
-- **ReDoc**: `http://localhost:8000/redoc`
-
-## API Endpoints
-
-### Companies API
-
-#### 1. Create Company
-
-**Endpoint**: `POST /api/v1/companies/`
-
-Create a new company with embedding model settings.
-
-**Request Body**:
-```json
-{
-  "name": "Acme Corp",
-  "description": "Technology company",
-  "embedding_model": "all-MiniLM-L6-v2",
-  "embedding_type": "local"
-}
+```bash
+cd frontend
+npm install
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1" > .env.local
+npm run dev     # http://localhost:3000
 ```
 
-**Example using curl**:
+---
+
+## ⚙️ Configuration
+
+### `/.env` (backend)
+
+```env
+# ── Database ──────────────────────────────────────────
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+
+# ── Default Embedding (overridden per-company) ────────
+VECTORIZER_TYPE=local              # local | openai | huggingface
+VECTORIZER_MODEL=all-MiniLM-L6-v2
+
+# ── LLM API Keys ──────────────────────────────────────
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...
+HUGGINGFACEHUB_API_TOKEN=hf_...
+
+# ── RAGAS Evaluation ──────────────────────────────────
+EVAL_LLM_MODEL=gpt-4
+EVAL_LLM_PROVIDER=openai
+EVAL_BATCH_SIZE=10
+EVAL_OUTPUT_DIR=evaluations/results
+EVAL_SAVE_TO_DB=true
+EVAL_SAVE_TO_JSON=true
+```
+
+For local LLM setup (Ollama, local HuggingFace models), see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
+
+---
+
+## 🔄 Workflow
+
+Follow these five steps to go from a fresh database to a working RAG chat.
+
+### Step 1 — Create a Company
+
+A company holds the embedding model and LLM settings used by all its users and documents.
+
 ```bash
 curl -X POST "http://localhost:8000/api/v1/companies/" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Acme Corp",
-    "description": "Technology company",
     "embedding_model": "all-MiniLM-L6-v2",
-    "embedding_type": "local"
+    "embedding_type": "local",
+    "llm_model": "gpt-4",
+    "llm_provider": "openai",
+    "llm_temperature": 0.7
   }'
 ```
 
-**Response**:
+<details>
+<summary>Response</summary>
+
 ```json
 {
-  "id": 1,
+  "id": "550e8400-e29b-41d4-a716-446655440000",
   "name": "Acme Corp",
-  "description": "Technology company",
   "embedding_model": "all-MiniLM-L6-v2",
   "embedding_type": "local",
+  "llm_model": "gpt-4",
+  "llm_provider": "openai",
+  "llm_temperature": 0.7,
+  "llm_max_tokens": null,
   "created_at": "2024-01-12T10:00:00"
 }
 ```
+</details>
 
-#### 2. Get All Companies
+---
 
-**Endpoint**: `GET /api/v1/companies/`
+### Step 2 — Create a User
 
-Retrieve all companies.
-
-**Example**:
-```bash
-curl -X GET "http://localhost:8000/api/v1/companies/"
-```
-
-#### 3. Get Company by ID
-
-**Endpoint**: `GET /api/v1/companies/{company_id}`
-
-Get a specific company by ID.
-
-**Example**:
-```bash
-curl -X GET "http://localhost:8000/api/v1/companies/1"
-```
-
-#### 4. Update Company
-
-**Endpoint**: `PUT /api/v1/companies/{company_id}`
-
-Update company details.
-
-**Request Body**:
-```json
-{
-  "name": "Updated Company Name",
-  "description": "Updated description",
-  "embedding_model": "text-embedding-ada-002",
-  "embedding_type": "openai"
-}
-```
-
-**Example**:
-```bash
-curl -X PUT "http://localhost:8000/api/v1/companies/1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "embedding_model": "text-embedding-ada-002",
-    "embedding_type": "openai"
-  }'
-```
-
-#### 5. Update Company Embedding Model
-
-**Endpoint**: `PUT /api/v1/companies/{company_id}/embedding-model`
-
-Update only the embedding model settings for a company.
-
-**Example**:
-```bash
-curl -X PUT "http://localhost:8000/api/v1/companies/1/embedding-model?embedding_model=text-embedding-ada-002&embedding_type=openai"
-```
-
-#### 6. Update Company LLM Configuration
-
-**Endpoint**: `PUT /api/v1/companies/{company_id}/llm-config`
-
-Update the LLM configuration for a company (supports local models like Ollama).
-
-**Query Parameters**:
-- `llm_model` (required): Model name (e.g., "llama2", "mistral", "gpt-4")
-- `llm_provider` (required): Provider type (`openai`, `anthropic`, `google`, `huggingface`, `ollama`, `local_hf`)
-- `llm_endpoint` (optional): Endpoint URL for local models (e.g., "http://localhost:11434")
-- `llm_api_key` (optional): API key for cloud providers
-- `llm_temperature` (optional, default: 0.7): Temperature for generation
-- `llm_max_tokens` (optional): Max tokens for generation
-
-**Example using Ollama**:
-```bash
-curl -X PUT "http://localhost:8000/api/v1/companies/1/llm-config?llm_model=llama2&llm_provider=ollama&llm_endpoint=http://localhost:11434&llm_temperature=0.7"
-```
-
-**Example using local HuggingFace**:
-```bash
-curl -X PUT "http://localhost:8000/api/v1/companies/1/llm-config?llm_model=gpt2&llm_provider=local_hf&llm_temperature=0.8&llm_max_tokens=500"
-```
-
-**Example using OpenAI**:
-```bash
-curl -X PUT "http://localhost:8000/api/v1/companies/1/llm-config?llm_model=gpt-4&llm_provider=openai&llm_temperature=0.7"
-```
-
-For more details on local model setup, see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
-
-#### 7. Delete Company
-
-**Endpoint**: `DELETE /api/v1/companies/{company_id}`
-
-Delete a company.
-
-**Example**:
-```bash
-curl -X DELETE "http://localhost:8000/api/v1/companies/1"
-```
-
-### Users API
-
-#### 1. Create User
-
-**Endpoint**: `POST /api/v1/users/`
-
-Create a new user.
-
-**Request Body**:
-```json
-{
-  "email": "user@example.com",
-  "name": "John Doe",
-  "company_id": 1
-}
-```
-
-**Example using curl**:
 ```bash
 curl -X POST "http://localhost:8000/api/v1/users/" \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "user@example.com",
-    "name": "John Doe",
-    "company_id": 1
+    "email": "alice@acme.com",
+    "name": "Alice",
+    "company_id": "550e8400-e29b-41d4-a716-446655440000"
   }'
 ```
 
-**Response**:
-```json
-{
-  "id": 1,
-  "email": "user@example.com",
-  "name": "John Doe",
-  "company_id": 1,
-  "created_at": "2024-01-12T10:00:00"
-}
-```
+---
 
-#### 2. Get All Users
+### Step 3 — Upload Documents
 
-**Endpoint**: `GET /api/v1/users/`
+The service: extracts text from the PDF → cleans it → splits into overlapping chunks → embeds each chunk using the company's vectorizer → stores `DocumentVector` rows in PostgreSQL.
 
-Retrieve all users.
-
-**Example**:
 ```bash
-curl -X GET "http://localhost:8000/api/v1/users/"
-```
-
-#### 3. Get User by ID
-
-**Endpoint**: `GET /api/v1/users/{user_id}`
-
-Get a specific user by ID.
-
-**Example**:
-```bash
-curl -X GET "http://localhost:8000/api/v1/users/1"
-```
-
-#### 4. Get User by Email
-
-**Endpoint**: `GET /api/v1/users/email/{email}`
-
-Get a user by email address.
-
-**Example**:
-```bash
-curl -X GET "http://localhost:8000/api/v1/users/email/user@example.com"
-```
-
-#### 5. Update User
-
-**Endpoint**: `PUT /api/v1/users/{user_id}`
-
-Update user details.
-
-**Request Body**:
-```json
-{
-  "name": "Updated Name",
-  "company_id": 2
-}
-```
-
-**Example**:
-```bash
-curl -X PUT "http://localhost:8000/api/v1/users/1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Updated Name"
-  }'
-```
-
-#### 6. Delete User
-
-**Endpoint**: `DELETE /api/v1/users/{user_id}`
-
-Delete a user.
-
-**Example**:
-```bash
-curl -X DELETE "http://localhost:8000/api/v1/users/1"
-```
-
-#### 7. Get User's Company
-
-**Endpoint**: `GET /api/v1/users/{user_id}/company`
-
-Get the company associated with a user.
-
-**Example**:
-```bash
-curl -X GET "http://localhost:8000/api/v1/users/1/company"
-```
-
-**Response**:
-```json
-{
-  "company_id": 1,
-  "name": "Acme Corp",
-  "description": "Technology company",
-  "embedding_model": "all-MiniLM-L6-v2",
-  "embedding_type": "local",
-  "llm_model": "llama2",
-  "llm_provider": "ollama",
-  "llm_endpoint": "http://localhost:11434",
-  "llm_temperature": 0.7,
-  "llm_max_tokens": 1000
-}
-```
-
-### Documents API
-
-### 1. Upload PDF Document (Enhanced)
-
-**Endpoint**: `POST /api/v1/documents/upload`
-
-Upload a PDF file, extract text, create embeddings, and store in the database with enhanced features.
-
-**Request**:
-- Content-Type: `multipart/form-data`
-- Body:
-  - `file` (required): PDF file
-  - `company_id` (optional): Company ID to use company-specific embedding model settings
-  - `user_id` (optional): User ID for the document
-  - `chunk_size` (optional, default: 1000): Size of each chunk in characters
-  - `overlap` (optional, default: 200): Overlap between chunks in characters
-  - `metadata` (optional): Additional metadata as JSON string
-  - `preview_only` (optional, default: false): If true, only preview extracted text without creating embeddings
-  - `skip_empty_chunks` (optional, default: true): Skip chunks with no text content
-  - `clean_text` (optional, default: true): Clean and normalize text before processing
-
-**Example using curl**:
-```bash
-# Upload and process with company-specific embedding model
 curl -X POST "http://localhost:8000/api/v1/documents/upload" \
-  -H "accept: application/json" \
-  -F "file=@document.pdf" \
-  -F "company_id=1" \
-  -F "user_id=1" \
+  -F "file=@report.pdf" \
+  -F "company_id=550e8400-e29b-41d4-a716-446655440000" \
+  -F "user_id=660e8400-e29b-41d4-a716-446655440001" \
   -F "chunk_size=1000" \
   -F "overlap=200" \
   -F "clean_text=true"
-
-# Preview only (no processing)
-curl -X POST "http://localhost:8000/api/v1/documents/upload" \
-  -H "accept: application/json" \
-  -F "file=@document.pdf" \
-  -F "preview_only=true"
 ```
 
-**Example using Python**:
-```python
-import requests
+<details>
+<summary>Response</summary>
 
-url = "http://localhost:8000/api/v1/documents/upload"
-files = {"file": open("document.pdf", "rb")}
-data = {
-    "company_id": 1,  # Uses company's embedding model settings
-    "user_id": 1,
-    "chunk_size": 1000,
-    "overlap": 200,
-    "clean_text": True,
-    "skip_empty_chunks": True
-}
-
-response = requests.post(url, files=files, data=data)
-print(response.json())
-```
-
-**Response (Success)**:
 ```json
 {
   "status": "success",
-  "document_id": "550e8400-e29b-41d4-a716-446655440000",
-  "filename": "document.pdf",
-  "text_length": 15000,
-  "num_chunks": 15,
+  "document_id": "770e8400-e29b-41d4-a716-446655440002",
+  "filename": "report.pdf",
+  "text_length": 18500,
+  "num_chunks": 19,
   "chunk_size": 1000,
   "overlap": 200,
   "metadata": {
-    "filename": "document.pdf",
-    "file_size": 102400,
-    "pdf_metadata": {
-      "title": "Document Title",
-      "author": "Author Name",
-      "page_count": 10
-    }
-  },
-  "processing_info": {
-    "pages_processed": 10,
-    "text_cleaned": true,
-    "empty_chunks_skipped": true
+    "filename": "report.pdf",
+    "file_size": 204800,
+    "pdf_metadata": { "title": "Annual Report", "page_count": 24 }
   }
 }
 ```
+</details>
 
-**Response (Preview)**:
-```json
-{
-  "status": "preview",
-  "filename": "document.pdf",
-  "text_length": 15000,
-  "text_preview": "First 1000 characters of extracted text...",
-  "estimated_chunks": 15,
-  "metadata": {
-    "filename": "document.pdf",
-    "pdf_metadata": {
-      "page_count": 10
-    }
-  }
-}
-```
+---
 
-### 2. Batch Upload PDF Documents
+### Step 4 — Create a Chat Session
 
-**Endpoint**: `POST /api/v1/documents/upload/batch`
+Optionally scope the chat to specific documents — retrieval will only search those files.
 
-Upload multiple PDF files in a single request.
-
-**Request**:
-- Content-Type: `multipart/form-data`
-- Body:
-  - `files` (required): Multiple PDF files (max 10)
-  - `company_id` (optional): Company ID to use company-specific embedding model settings
-  - `user_id` (optional): User ID for the documents
-  - `chunk_size` (optional, default: 1000): Size of each chunk in characters
-  - `overlap` (optional, default: 200): Overlap between chunks in characters
-  - `metadata` (optional): Additional metadata as JSON string (applied to all files)
-  - `skip_empty_chunks` (optional, default: true): Skip chunks with no text content
-  - `clean_text` (optional, default: true): Clean and normalize text before processing
-
-**Example using curl**:
 ```bash
-curl -X POST "http://localhost:8000/api/v1/documents/upload/batch" \
-  -H "accept: application/json" \
-  -F "files=@document1.pdf" \
-  -F "files=@document2.pdf" \
-  -F "files=@document3.pdf" \
-  -F "company_id=1" \
-  -F "user_id=1" \
-  -F "chunk_size=1000"
+curl -X POST "http://localhost:8000/api/v1/chats/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "660e8400-e29b-41d4-a716-446655440001",
+    "company_id": "550e8400-e29b-41d4-a716-446655440000",
+    "title": "Q4 Analysis",
+    "selected_document_ids": ["770e8400-e29b-41d4-a716-446655440002"]
+  }'
 ```
 
-**Example using Python**:
-```python
-import requests
+> If `selected_document_ids` is omitted, retrieval searches **all** documents owned by the user.
 
-url = "http://localhost:8000/api/v1/documents/upload/batch"
-files = [
-    ("files", open("document1.pdf", "rb")),
-    ("files", open("document2.pdf", "rb")),
-    ("files", open("document3.pdf", "rb"))
-]
-data = {
-    "company_id": 1,  # Uses company's embedding model settings
-    "user_id": 1,
-    "chunk_size": 1000,
-    "clean_text": True
-}
+---
 
-response = requests.post(url, files=files, data=data)
-print(response.json())
+### Step 5 — Send a Query
+
+The LangGraph workflow:
+1. Embeds the query using the company's embedding model
+2. Performs cosine-similarity search over matching `DocumentVector` rows
+3. Injects the top-k chunks as context into the LLM prompt
+4. Generates a grounded answer
+5. Persists the `ChatMessage` (query + context + response)
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat-messages/query" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chat_id": "880e8400-e29b-41d4-a716-446655440003",
+    "query": "What was the total revenue in Q4?",
+    "use_retrieval": true,
+    "top_k": 5,
+    "max_history": 10
+  }'
 ```
 
-**Response**:
+<details>
+<summary>Response</summary>
+
 ```json
 {
-  "status": "completed",
-  "total_files": 3,
-  "successful": 2,
-  "failed": 1,
-  "results": [
+  "message_id": "990e8400-e29b-41d4-a716-446655440004",
+  "chat_id": "880e8400-...",
+  "query": "What was the total revenue in Q4?",
+  "response": "Based on Document 1, the total revenue in Q4 was $42.3 million, representing a 12% YoY increase...",
+  "context_documents": [
     {
-      "status": "success",
-      "document_id": "550e8400-e29b-41d4-a716-446655440000",
-      "filename": "document1.pdf",
-      "text_length": 15000,
-      "num_chunks": 15,
-      "metadata": {...}
-    },
-    {
-      "status": "success",
-      "document_id": "660e8400-e29b-41d4-a716-446655440001",
-      "filename": "document2.pdf",
-      "text_length": 20000,
-      "num_chunks": 20,
-      "metadata": {...}
+      "document_id": "770e8400-...",
+      "chunk_index": 7,
+      "content": "Q4 revenue reached $42.3M...",
+      "similarity": 0.94
     }
   ],
-  "errors": [
-    {
-      "filename": "document3.pdf",
-      "error": "No text could be extracted from the PDF"
-    }
-  ]
+  "created_at": "2024-01-12T10:04:00",
+  "llm_model": "gpt-4",
+  "llm_provider": "openai"
 }
 ```
+</details>
 
-### 2. Get Document
+---
 
-**Endpoint**: `GET /api/v1/documents/{document_id}`
+## 📡 API Reference
 
-Retrieve all chunks for a specific document.
+### Companies
 
-**Example**:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/companies/` | Create company |
+| `GET` | `/api/v1/companies/` | List all companies |
+| `GET` | `/api/v1/companies/{id}` | Get company by ID |
+| `PUT` | `/api/v1/companies/{id}` | Update company |
+| `PUT` | `/api/v1/companies/{id}/embedding-model` | Update embedding model only |
+| `PUT` | `/api/v1/companies/{id}/llm-config` | Update LLM config (query params) |
+| `DELETE` | `/api/v1/companies/{id}` | Delete company |
+
+<details>
+<summary>LLM config examples</summary>
+
 ```bash
-curl -X GET "http://localhost:8000/api/v1/documents/550e8400-e29b-41d4-a716-446655440000"
+# Ollama (local)
+curl -X PUT "http://localhost:8000/api/v1/companies/{id}/llm-config?llm_model=llama2&llm_provider=ollama&llm_endpoint=http://localhost:11434"
+
+# OpenAI
+curl -X PUT "http://localhost:8000/api/v1/companies/{id}/llm-config?llm_model=gpt-4&llm_provider=openai"
+
+# Anthropic
+curl -X PUT "http://localhost:8000/api/v1/companies/{id}/llm-config?llm_model=claude-3-sonnet-20240229&llm_provider=anthropic"
 ```
 
-**Response**:
+Supported providers: `openai` · `anthropic` · `google` · `huggingface` · `ollama` · `local_hf`
+</details>
+
+---
+
+### Users
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/users/` | Create user |
+| `GET` | `/api/v1/users/` | List all users |
+| `GET` | `/api/v1/users/{id}` | Get user by ID |
+| `GET` | `/api/v1/users/email/{email}` | Get user by email |
+| `PUT` | `/api/v1/users/{id}` | Update user |
+| `DELETE` | `/api/v1/users/{id}` | Delete user |
+| `GET` | `/api/v1/users/{id}/company` | Get user's company details |
+
+---
+
+### Documents
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/documents/upload` | Upload & embed a single PDF |
+| `POST` | `/api/v1/documents/upload/batch` | Upload & embed up to 10 PDFs |
+| `GET` | `/api/v1/documents/{document_id}` | Retrieve chunks for a document |
+| `DELETE` | `/api/v1/documents/{document_id}` | Delete document and all chunks |
+| `POST` | `/api/v1/documents/search` | Semantic search (form: `query`, `limit`) |
+
+<details>
+<summary>Upload parameters</summary>
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `file` | File | **required** | PDF file |
+| `company_id` | UUID | optional | Use company's embedding model |
+| `user_id` | UUID | optional | Document owner |
+| `chunk_size` | int | 1000 | Characters per chunk |
+| `overlap` | int | 200 | Overlap between chunks |
+| `preview_only` | bool | false | Extract text only, skip embedding |
+| `clean_text` | bool | true | Normalise whitespace/encoding |
+| `skip_empty_chunks` | bool | true | Skip blank chunks |
+| `metadata` | JSON string | optional | Extra JSONB metadata |
+</details>
+
+---
+
+### Chats
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/chats/` | Create chat session |
+| `GET` | `/api/v1/chats/user/{user_id}` | List user's chats |
+| `PUT` | `/api/v1/chats/{chat_id}/rename` | Rename a chat |
+| `DELETE` | `/api/v1/chats/{chat_id}` | Delete chat + all messages |
+| `GET` | `/api/v1/chats/documents/company/{company_id}` | List documents for a company |
+
+---
+
+### Chat Messages
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/chat-messages/query` | Process query (full RAG pipeline) |
+| `GET` | `/api/v1/chat-messages/chat/{chat_id}` | Fetch all messages in a chat |
+| `DELETE` | `/api/v1/chat-messages/{message_id}` | Delete a message |
+
+<details>
+<summary>Query request body</summary>
+
 ```json
 {
-  "document_id": "550e8400-e29b-41d4-a716-446655440000",
-  "num_chunks": 15,
-  "chunks": [
-    {
-      "chunk_index": 0,
-      "content": "First chunk of text...",
-      "embedding_length": 384,
-      "metadata": {
-        "filename": "document.pdf"
-      },
-      "created_at": "2024-01-08T11:30:00"
-    }
-  ]
+  "chat_id": "<uuid>",
+  "query": "Your question here",
+  "use_retrieval": true,
+  "top_k": 5,
+  "max_history": 10,
+  "llm_model": null,
+  "llm_provider": null
 }
 ```
 
-### 3. Delete Document
+> `llm_model` and `llm_provider` override company settings when provided.
+</details>
 
-**Endpoint**: `DELETE /api/v1/documents/{document_id}`
+---
 
-Delete a document and all its chunks.
+### Health Check
 
-**Example**:
-```bash
-curl -X DELETE "http://localhost:8000/api/v1/documents/550e8400-e29b-41d4-a716-446655440000"
+```
+GET /health  →  {"status": "healthy"}
+GET /        →  {"message": "RAG Document Embedding API", "version": "0.1.0", ...}
 ```
 
-**Response**:
-```json
-{
-  "status": "success",
-  "message": "Document 550e8400-e29b-41d4-a716-446655440000 deleted successfully"
-}
-```
+---
 
-### 4. Search Documents
+## 🗄️ Database Schema
 
-**Endpoint**: `POST /api/v1/documents/search`
+<details>
+<summary>companies</summary>
 
-Search for similar documents using vector similarity.
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID PK | auto |
+| `name` | String | indexed |
+| `description` | String | optional |
+| `embedding_model` | String | indexed |
+| `embedding_type` | String | `local` · `openai` · `huggingface` |
+| `llm_model` | String | indexed |
+| `llm_provider` | String | indexed |
+| `llm_endpoint` | String | for local models |
+| `llm_api_key` | String | stored key |
+| `llm_temperature` | Float | default 0.7 |
+| `llm_max_tokens` | Integer | optional |
+| `created_at` | Timestamp | |
+</details>
 
-**Request**:
-- Content-Type: `multipart/form-data`
-- Body:
-  - `query` (required): Search query text
-  - `user_id` (optional): User ID to filter by
-  - `limit` (optional, default: 5): Maximum number of results
+<details>
+<summary>users</summary>
 
-**Example**:
-```bash
-curl -X POST "http://localhost:8000/api/v1/documents/search" \
-  -F "query=What is machine learning?" \
-  -F "limit=5"
-```
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID PK | auto |
+| `email` | String | unique, indexed |
+| `name` | String | |
+| `company_id` | UUID FK | → companies |
+| `created_at` | Timestamp | |
+</details>
 
-**Response**:
-```json
-{
-  "query": "What is machine learning?",
-  "num_results": 3,
-  "results": [
-    {
-      "document_id": "550e8400-e29b-41d4-a716-446655440000",
-      "chunk_index": 2,
-      "content": "Machine learning is a subset of artificial intelligence...",
-      "similarity_score": 0.95,
-      "metadata": {
-        "filename": "document.pdf"
-      }
-    }
-  ]
-}
-```
+<details>
+<summary>document_vectors</summary>
 
-### 5. Health Check
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID PK | auto |
+| `content` | Text | chunk text |
+| `embedding` | Vector | variable-length pgvector column |
+| `meta_data` | JSONB | filename, page count, custom fields |
+| `document_id` | UUID | indexed; groups chunks |
+| `chunk_index` | Integer | order within document |
+| `user_id` | UUID | indexed |
+| `company_id` | UUID | indexed; optional |
+| `created_at` | Timestamp | |
+</details>
 
-**Endpoint**: `GET /health`
+<details>
+<summary>chats</summary>
 
-Check if the API is running.
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID PK | |
+| `title` | String | optional |
+| `user_id` | UUID FK | → users, indexed |
+| `company_id` | UUID FK | → companies, indexed |
+| `selected_document_ids` | JSONB | scoped retrieval |
+| `created_at` | Timestamp | |
+| `updated_at` | Timestamp | |
+</details>
 
-**Example**:
-```bash
-curl -X GET "http://localhost:8000/health"
-```
+<details>
+<summary>chat_messages</summary>
 
-**Response**:
-```json
-{
-  "status": "healthy"
-}
-```
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID PK | |
+| `chat_id` | UUID FK | → chats, indexed |
+| `chat_query` | String | indexed |
+| `context_document` | JSONB | retrieved chunks |
+| `response` | String | LLM answer |
+| `status` | String | `processing` · `done` · `error` |
+| `created_at` | Timestamp | |
+</details>
 
-## User and Company Tracking
+---
 
-All document embeddings now include `user_id` and `company_id` for proper ownership tracking and access control:
+## 🖥️ Frontend
 
-### Automatic Tracking
+A **Next.js 15** (App Router) + **TypeScript** + **Tailwind CSS** + **shadcn/ui** chat interface.
 
-When uploading documents, the system automatically:
-1. Stores `user_id` with each document chunk (defaults to 0 if not provided)
-2. Stores `company_id` with each document chunk (optional, for multi-tenant scenarios)
-3. Uses company's embedding model settings when `company_id` is provided
+### Key Components
 
-### Benefits
+| Component | Description |
+|-----------|-------------|
+| `CompanyUserSelector` | Select company & user (no login required) |
+| `ChatSidebar` | List, create, rename, and delete chats |
+| `ChatInterface` | Scrollable message thread |
+| `ChatInput` | Text input with send handler |
+| `ChatMessage` | Renders markdown responses |
+| `FileUpload` | Drag-and-drop PDF upload with progress |
+| `DocumentSelector` | Scope a chat to specific uploaded documents |
+| `ReferenceCard` | Shows source chunks used in a response |
 
-- **Multi-tenant Support**: Different companies can have separate document collections
-- **User Isolation**: Documents are associated with specific users
-- **Access Control**: Easy to filter documents by user or company
-- **Audit Trail**: Complete tracking of document ownership
+### Usage
 
-### Query Examples
+1. Select a **company**, then a **user**
+2. Click **New Chat** in the sidebar
+3. (Optional) Select specific documents to restrict retrieval
+4. Type a question and press **Send**
+5. Responses appear with source references inline
+6. Use **File Upload** to add more PDFs at any time
 
-```python
-from layers.dao import DocumentVectorDAO
-from layers.database import SessionLocal
+---
 
-session = SessionLocal()
-dao = DocumentVectorDAO(session)
+## 📊 RAGAS Evaluation Pipeline
 
-# Get all documents for a user
-user_docs = dao.get_vectors_by_user_id(user_id=1)
+Automatically measure the quality of your RAG system using RAGAS.
 
-# Get all documents for a company
-company_docs = dao.get_vectors_by_company_id(company_id=1)
+### Metrics
 
-# Get documents for a specific user within a company
-user_company_docs = dao.get_vectors_by_user_and_company(
-    user_id=1,
-    company_id=1
-)
-```
+| Metric | What it measures |
+|--------|-----------------|
+| **Faithfulness** | Is the answer supported by the retrieved context? |
+| **Answer Relevance** | Does the answer address the question? |
+| **Context Precision** | Are the retrieved chunks relevant to the question? |
 
-## Company-Specific Embedding Models
-
-Each company can have its own embedding model configuration, allowing different companies to use different embedding strategies:
-
-### Setting Company Embedding Model
-
-Update a company's embedding model settings:
-
-```python
-from layers.dao import CompanyDAO
-from sqlmodel import Session
-
-# Create a database session
-session = SessionLocal()
-
-# Create company DAO
-company_dao = CompanyDAO(session)
-
-# Update embedding model for a company
-company = company_dao.update_embedding_model(
-    company_id=1,
-    embedding_model="all-MiniLM-L6-v2",
-    embedding_type="local"
-)
-```
-
-### Using Company-Specific Settings
-
-When uploading documents, specify the `company_id` parameter to use that company's embedding model:
+### CLI Usage
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/documents/upload" \
-  -F "file=@document.pdf" \
-  -F "company_id=1"  # Uses company 1's embedding model
+# Evaluate last 7 days (default)
+python -m evaluations.run_evaluations --company-id <uuid>
+
+# Evaluate last 30 days
+python -m evaluations.run_evaluations --company-id <uuid> --days 30
+
+# Evaluate all time
+python -m evaluations.run_evaluations --company-id <uuid> --days 0
+
+# Preview scope without running
+python -m evaluations.run_evaluations --preview --company-id <uuid>
+
+# Dry run — no DB writes
+python -m evaluations.run_evaluations --company-id <uuid> --dry-run
+
+# Single query evaluation
+python -m evaluations.run_evaluations --single \
+  --question "What is the revenue?" \
+  --answer "Revenue was $42M in Q4." \
+  --contexts "Q4 revenue reached $42M." "Financial summary shows growth."
 ```
 
-If no `company_id` is provided, the system uses the default embedding model from environment variables.
+Results are saved as JSON to `evaluations/results/` and optionally to the `evaluation_jobs` / `evaluation_results` tables. See [evaluations/README.md](evaluations/README.md) for the full reference.
 
-### Available Embedding Types
+---
 
-#### Local Vectorizer (Default)
-- Uses sentence-transformers library
-- No API key required
-- Runs locally on your machine
-- Default model: `all-MiniLM-L6-v2`
-- Example: `embedding_type="local", embedding_model="all-MiniLM-L6-v2"`
+## 🛠️ Development
 
-#### OpenAI Vectorizer
-- Uses OpenAI's embedding API
-- Requires `OPENAI_API_KEY`
-- Default model: `text-embedding-ada-002`
-- Higher quality embeddings but costs money
-- Example: `embedding_type="openai", embedding_model="text-embedding-ada-002"`
+### Supported Embedding Types
 
-#### HuggingFace Vectorizer
-- Uses HuggingFace's inference API
-- Requires `HUGGINGFACE_API_KEY`
-- Supports various models
-- Free tier available
-- Example: `embedding_type="huggingface", embedding_model="sentence-transformers/all-MiniLM-L6-v2"`
+| `embedding_type` | Library | API Key |
+|-----------------|---------|---------|
+| `local` | `sentence-transformers` | None |
+| `openai` | `openai` Python client | `OPENAI_API_KEY` |
+| `huggingface` | HuggingFace Inference API | `HUGGINGFACE_API_KEY` |
 
-## Database Schema
+### Supported LLM Providers
 
-### DocumentVector Table
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | Integer | Primary key |
-| content | Text | Chunk content |
-| embedding | Vector(1536) | Embedding vector |
-| meta_data | JSONB | Additional metadata |
-| document_id | String | Document identifier |
-| chunk_index | Integer | Chunk order |
-| user_id | Integer | User ID (indexed) |
-| company_id | Integer | Company ID (indexed, optional) |
-| created_at | Timestamp | Creation time |
-
-### Company Table
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | Integer | Primary key |
-| name | String | Company name (indexed) |
-| description | String | Company description |
-| embedding_model | String | Embedding model name (indexed) |
-| embedding_type | String | Embedding type (indexed) |
-| llm_model | String | LLM model name (indexed) |
-| llm_provider | String | LLM provider type (indexed) |
-| llm_endpoint | String | LLM endpoint URL (indexed, optional) |
-| llm_api_key | String | LLM API key (optional) |
-| llm_temperature | Float | LLM temperature setting |
-| llm_max_tokens | Integer | LLM max tokens setting (optional) |
-| created_at | Timestamp | Creation time |
-
-## Development
-
-### Running Tests
-```bash
-pytest
-```
+| `llm_provider` | Service | Credential |
+|----------------|---------|-----------|
+| `openai` | OpenAI API | `OPENAI_API_KEY` |
+| `anthropic` | Anthropic API | `ANTHROPIC_API_KEY` |
+| `google` | Google Gemini | `GOOGLE_API_KEY` |
+| `huggingface` | HuggingFace Hub | `HUGGINGFACEHUB_API_TOKEN` |
+| `ollama` | Ollama (local) | `llm_endpoint` (default `http://localhost:11434`) |
+| `local_hf` | Local HuggingFace pipeline | Model downloaded locally; CUDA optional |
 
 ### Database Migrations
-```bash
-# Create a new migration
-alembic revision --autogenerate -m "description"
 
-# Apply migrations
+```bash
+# After editing models.py
+alembic revision --autogenerate -m "describe change"
 alembic upgrade head
 
-# Rollback migrations
+# Rollback
 alembic downgrade -1
 ```
 
-## Troubleshooting
+---
 
-### pgvector Extension Not Found
-Make sure pgvector is installed in PostgreSQL:
+## 🔧 Troubleshooting
+
+<details>
+<summary>pgvector extension not found</summary>
+
 ```sql
+-- Connect to your database and run:
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
+</details>
 
-### OpenAI API Errors
-Verify your `OPENAI_API_KEY` is set correctly in the `.env` file.
+<details>
+<summary>API key errors</summary>
 
-### PDF Extraction Issues
-Ensure the PDF file is not password-protected or corrupted.
+```bash
+# Check keys are exported
+echo $OPENAI_API_KEY
 
-### Local Model Issues
-If you encounter issues with local models (Ollama, HuggingFace):
-1. Ensure Ollama is running: `curl http://localhost:11434/api/tags`
-2. Check if the model is downloaded: `ollama list`
-3. Verify you have enough RAM/VRAM for local HuggingFace models
-4. Check CUDA availability for GPU acceleration: `python -c "import torch; print(torch.cuda.is_available())"`
+# Or verify they are in your .env file
+grep OPENAI_API_KEY .env
+```
+</details>
 
-For detailed troubleshooting, see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
+<details>
+<summary>Ollama connection refused</summary>
 
-## License
+```bash
+# Check Ollama is running
+curl http://localhost:11434/api/tags
 
-MIT License
+# List downloaded models
+ollama list
 
-## Contributing
+# Pull a model if needed
+ollama pull llama2
+```
+</details>
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+<details>
+<summary>PDF returns empty text</summary>
+
+- The PDF may be image-only (scanned). Text extraction requires a text-layer PDF.
+- Test with `preview_only=true` before committing embeddings.
+- Password-protected PDFs are not supported.
+</details>
+
+<details>
+<summary>Local HuggingFace model out-of-memory</summary>
+
+- Use a smaller model (e.g. `gpt2`).  
+- Enable CUDA: `python -c "import torch; print(torch.cuda.is_available())"`.
+- Reduce `llm_max_tokens` for the company's config.
+</details>
+
+<details>
+<summary>Evaluation: OPENAI_API_KEY is required</summary>
+
+```bash
+export OPENAI_API_KEY=sk-...
+python -m evaluations.run_evaluations --company-id <uuid>
+```
+</details>
+
+For detailed local model documentation, see [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
+
+---
+
+## 📄 License
+
+[MIT](LICENSE) — feel free to use, modify, and distribute.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
