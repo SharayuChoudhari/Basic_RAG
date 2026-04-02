@@ -125,6 +125,124 @@ HUGGINGFACEHUB_API_TOKEN=hf_...
 
 ---
 
+## How It Works
+
+This section describes the end-to-end data flow for the two core pipelines: **Document Ingestion** and **RAG Query**.
+
+---
+
+### Document Ingestion Pipeline
+
+```
+┌──────────┐     ┌──────────────┐     ┌──────────────────┐     ┌─────────────────┐     ┌──────────────────┐
+│  Client  │────▶│  POST        │────▶│ DocumentEmbedding│────▶│  Vectorizer      │────▶│   PostgreSQL     │
+│(Browser/ │     │  /documents/ │     │    Service       │     │(local / OpenAI / │     │  (pgvector)      │
+│  cURL)   │     │  upload      │     │                  │     │   HuggingFace)   │     │                  │
+└──────────┘     └──────────────┘     └──────────────────┘     └─────────────────┘     └──────────────────┘
+                                              │
+                        ┌─────────────────────┼──────────────────────┐
+                        ▼                     ▼                      ▼
+                 Extract text           Split into              Generate
+                 from PDF               overlapping             embeddings
+                 (PyMuPDF)              chunks                  (float vectors)
+                                     (chunk_size +
+                                      overlap)
+```
+
+**Step-by-step:**
+
+1. **Client uploads a PDF** via `POST /api/v1/documents/upload` with `company_id`, `user_id`, optional `chunk_size` and `overlap`.
+2. **`DocumentEmbeddingController`** receives the file and delegates to **`DocumentEmbeddingService`**.
+3. **Text extraction** — PyMuPDF reads the binary PDF and returns raw page text.
+4. **Chunking** — text is split into overlapping windows (default 1000 chars, 200 overlap) to preserve cross-boundary context.
+5. **Embedding** — each chunk is passed to the **`Vectorizer`** (configured per-company as `local`, `openai`, or `huggingface`) which returns a float vector.
+6. **Persistence** — each chunk + its vector is stored as a `DocumentVector` row in PostgreSQL (pgvector column).
+
+---
+
+### RAG Query Pipeline
+
+```
+┌──────────┐     ┌──────────────┐     ┌──────────────────────────────────────────────────────────────────┐
+│  Client  │────▶│  POST        │────▶│                      LangGraph Workflow                           │
+│          │     │/chat-messages│     │                                                                    │
+│          │     │  /query      │     │  ┌──────────┐   ┌───────────┐   ┌───────────┐   ┌─────────────┐  │
+└──────────┘     └──────────────┘     │  │  Embed   │──▶│  Vector   │──▶│  Build    │──▶│    LLM      │  │
+                                      │  │  Query   │   │  Search   │   │  Prompt   │   │  Generate   │  │
+                                      │  │(Vectorize│   │(pgvector  │   │(system +  │   │  Answer     │  │
+                                      │  │  r)      │   │cosine sim)│   │ context + │   │             │  │
+                                      │  └──────────┘   └───────────┘   │ history + │   └──────┬──────┘  │
+                                      │                                  │ question) │          │         │
+                                      │                                  └───────────┘          │         │
+                                      └──────────────────────────────────────────────────────────┼─────────┘
+                                                                                                 │
+                                      ┌──────────────────────────────────────────────────────────▼─────────┐
+                                      │               Save ChatMessage (question + answer + sources)        │
+                                      │                         PostgreSQL                                  │
+                                      └────────────────────────────────────────────────────────────────────┘
+                                                                                                 │
+                                                                                                 ▼
+                                                                                        Return to Client
+                                                                               (answer + reference chunks)
+```
+
+**Step-by-step:**
+
+1. **Client sends a question** via `POST /api/v1/chat-messages/query` with `chat_id`, `query`, and optional `top_k`.
+2. **`ChatMessagesController`** loads the chat session (which knows the company → embedding model and LLM config).
+3. **Query embedding** — the user's question is vectorized with the same `Vectorizer` used during ingestion.
+4. **Vector search** — `DocumentVectorsDAO` runs a cosine-similarity query against `pgvector`, returning the `top_k` most relevant chunks. If the chat has `selected_document_ids`, the search is scoped to those documents only.
+5. **Prompt construction** — LangGraph assembles a prompt from:
+   - The company's **system prompt**
+   - **Conversation history** (previous messages in this chat session)
+   - The **retrieved chunks** as inline context
+   - The user's **question**
+6. **LLM call** — the assembled prompt is sent to the configured LLM provider (OpenAI, Anthropic, Gemini, Ollama, etc.).
+7. **Persistence** — both the user `ChatMessage` and the assistant `ChatMessage` (with `source_chunks` attached) are saved to PostgreSQL.
+8. **Response** — the answer and the source reference chunks are returned to the client.
+
+---
+
+### Full System Overview
+
+```
+                          ┌─────────────────────────────────────────┐
+                          │            Next.js Frontend              │
+                          │  CompanyUserSelector → ChatSidebar →    │
+                          │  FileUpload → ChatInterface              │
+                          └──────────────────┬──────────────────────┘
+                                             │ HTTP (REST)
+                          ┌──────────────────▼──────────────────────┐
+                          │           FastAPI Backend                │
+                          │                                          │
+                          │  controllers/  →  services/  →  layers/ │
+                          │  (routing)        (business    (DAO +    │
+                          │                   logic)       models)   │
+                          └──────────┬───────────────────────────────┘
+                                     │
+                    ┌────────────────┼────────────────┐
+                    ▼                ▼                 ▼
+             ┌────────────┐  ┌────────────┐  ┌───────────────┐
+             │ PostgreSQL │  │ Vectorizer │  │  LLM Provider │
+             │ +pgvector  │  │(local/OAI/ │  │(OpenAI/Ant/   │
+             │            │  │  HF)       │  │ Gemini/Ollama)│
+             └────────────┘  └────────────┘  └───────────────┘
+```
+
+**Data entities and relationships:**
+
+```
+Company
+  ├── embedding_model / embedding_type   (shared across users)
+  ├── llm_model / llm_provider           (shared across users)
+  └── Users
+        └── DocumentVectors              (embedded PDF chunks)
+        └── Chats
+              └── ChatMessages           (question + answer + sources)
+```
+
+---
+
 ## Workflow
 
 ### 1 — Create a Company
